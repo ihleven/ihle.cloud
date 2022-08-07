@@ -1,4 +1,5 @@
 {
+  "name": "ihle.cloud",
   "private": true,
   "scripts": {
     "build": "nuxt build",
@@ -7,6 +8,7 @@
     "preview": "nuxt preview"
   },
   "devDependencies": {
+    "@kevinmarrec/nuxt-pwa": "^0.4.2",
     "nuxt": "3.0.0-rc.6"
   }
 }
