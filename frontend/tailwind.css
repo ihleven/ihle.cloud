@@ -23,16 +23,19 @@
 
 
 @layer utilities {
-  @variants hover, focus {
-  /* .scroll-snap-none {
-    scroll-snap-type: none;
+
+  .text-outline {
+    color: white;
+    text-shadow: -.5px -.5px 0 #000, .5px -.5px 0 #000, -.5px .5px 0 #000, .5px .5px 0 #000;
   }
-  .scroll-snap-x {
-    scroll-snap-type: x;
+  .text-outline-1 {
+    color: white;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
   }
-  .scroll-snap-y {
-    scroll-snap-type: y;
-  } */
+
+
+
+
     .outline1 {
         color: black !important;
         text-shadow: 1px 1px 0px white, 1px -1px 0px white, -1px 1px 0px white, -1px -1px 0px white;
@@ -73,6 +76,5 @@
   }
 
 
-}
-}
 
+}
