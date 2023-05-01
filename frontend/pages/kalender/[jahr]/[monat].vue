@@ -3,5 +3,5 @@
   <NuxtPage />
 </template>
 <script setup>
-const { params } = useRoute();
+  const { params } = useRoute()
 </script>

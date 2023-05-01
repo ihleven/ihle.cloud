@@ -1,7 +1,9 @@
 <template>
-  <h1 class="bg-cyan-100">Jahr: {{ params.jahr }}</h1>
-  <NuxtPage />
+  <div>
+    <h1 class="bg-cyan-100">Jahr: {{ params.jahr }}</h1>
+    <NuxtPage />
+  </div>
 </template>
 <script setup>
-const { params } = useRoute();
+  const { params } = useRoute()
 </script>

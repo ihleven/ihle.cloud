@@ -7,16 +7,16 @@
 
     <article class="border-1 border-dotted border-gray-300">
       <ContentDoc
-        class="prose max-w-none prose-img:rounded-xl prose-headings:no-underline prose-a:font-semibold prose-a:underline prose-a:underline-offset-4 prose-a:decoration-sky-300 hover:prose-a:decoration-2"
+        class="prose max-w-none prose-headings:no-underline prose-a:font-semibold prose-a:underline prose-a:decoration-sky-300 prose-a:underline-offset-4 hover:prose-a:decoration-2 prose-img:rounded-xl"
       />
     </article>
   </main>
 </template>
 
 <script setup>
-const route = useRoute();
+  const route = useRoute()
 
-const path = computed(() => {
-  return route.params.slug ? route.params.slug.join("/") : "";
-});
+  const path = computed(() => {
+    return route.params.slug ? route.params.slug.join('/') : ''
+  })
 </script>

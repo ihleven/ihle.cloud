@@ -1,21 +1,24 @@
 <template>
-  <main class="w-screen grid grid-cols-2">
-    <section class="bg-ral-7035 col-span-2 aspect-[2/1] flex items-center justify-center">
+  <main class="grid w-screen grid-cols-2">
+    <section class="col-span-2 flex aspect-[2/1] items-center justify-center bg-ral-7035">
       <Logo />
     </section>
 
-    <nuxt-link to="/videos" class="bg-blue-500 bg-opacity-90 p-8 aspect-square">
-      <h1 class="text-white text-lg font-black hover:text-outline">Videos</h1>
+    <nuxt-link to="/videos" class="aspect-square bg-blue-500 bg-opacity-90 p-8">
+      <h1 class="hover:text-outline text-lg font-black text-white">Videos</h1>
     </nuxt-link>
 
-    <section class="bg-green-500 bg-opacity-90 aspect-square">
-      <nuxt-link v-if="dev" to="/kalender" class="block w-full h-full p-8">
-        <h1 class="text-white text-lg font-black hover:text-outline">Kalender</h1>
+    <section class="aspect-square bg-green-500 bg-opacity-90">
+      <nuxt-link v-if="dev" to="/kalender" class="block h-full w-full p-8">
+        <h1 class="hover:text-outline text-lg font-black text-white">Kalender</h1>
       </nuxt-link>
     </section>
 
-    <section class="bg-sky-500 bg-opacity-80 aspect-square">
-      <nuxt-link v-if="dev" to="/mediathek" class="block w-full h-full p-8 text-white text-lg font-extralight hover:font-normal hover:text-outline"
+    <section class="aspect-square bg-sky-500 bg-opacity-80">
+      <nuxt-link
+        v-if="dev"
+        to="/mediathek"
+        class="hover:text-outline block h-full w-full p-8 text-lg font-extralight text-white hover:font-normal"
         >Mediathek
       </nuxt-link>
       <!-- <dl class="text-white text-lg font-extralight hover:font-normal">
@@ -25,10 +28,10 @@
       </dl> -->
     </section>
 
-    <section class="bg-cyan-300 bg-opacity-80 aspect-square"></section>
+    <section class="aspect-square bg-cyan-300 bg-opacity-80"></section>
   </main>
 </template>
 <script setup>
-const env = process.env.NODE_ENV;
-const dev = env === "development";
+  const env = process.env.NODE_ENV
+  const dev = env === 'development'
 </script>

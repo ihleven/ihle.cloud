@@ -1,22 +1,25 @@
 <template>
-  <main class="w-screen grid grid-cols-2">
+  <main class="grid w-screen grid-cols-2">
     <NavigationBar /><i></i>
     <nuxt-link to="/mediathek/Die-Erben-der-Saurier/1.1-Eine-neue-Zeit">
       <article
-        class="p-8 aspect-square text-white bg-sky-300 text-lg font-black hover:text-outline bg-[url('/api/proxy/public/mediathek/Die-Erben-der-Saurier/cover.jpg')] bg-cover bg-center bg-no-repeat"
+        class="hover:text-outline aspect-square bg-sky-300 bg-[url('/api/proxy/public/mediathek/Die-Erben-der-Saurier/cover.jpg')] bg-cover bg-center bg-no-repeat p-8 text-lg font-black text-white"
       >
         Die Erben der Saurier
       </article>
     </nuxt-link>
 
-    <section class="bg-green-500 bg-opacity-90 aspect-square">
-      <nuxt-link v-if="dev" to="/kalender" class="block w-full h-full p-8">
-        <h1 class="text-white text-lg font-black hover:text-outline">Kalender</h1>
+    <section class="aspect-square bg-green-500 bg-opacity-90">
+      <nuxt-link v-if="dev" to="/kalender" class="block h-full w-full p-8">
+        <h1 class="hover:text-outline text-lg font-black text-white">Kalender</h1>
       </nuxt-link>
     </section>
 
-    <section class="bg-sky-500 bg-opacity-80 aspect-square">
-      <nuxt-link v-if="dev" to="/mediathek" class="block w-full h-full p-8 text-white text-lg font-extralight hover:font-normal hover:text-outline"
+    <section class="aspect-square bg-sky-500 bg-opacity-80">
+      <nuxt-link
+        v-if="dev"
+        to="/mediathek"
+        class="hover:text-outline block h-full w-full p-8 text-lg font-extralight text-white hover:font-normal"
         >Mediathek
       </nuxt-link>
       <!-- <dl class="text-white text-lg font-extralight hover:font-normal">
@@ -26,7 +29,7 @@
       </dl> -->
     </section>
 
-    <section class="bg-cyan-300 bg-opacity-80 aspect-square"></section>
+    <section class="aspect-square bg-cyan-300 bg-opacity-80"></section>
   </main>
 </template>
 

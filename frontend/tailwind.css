@@ -8,7 +8,7 @@
   }
   h2 {
     @apply text-xl font-semibold;
-  } 
+  }
   dl {
     @apply text-lg;
   }
@@ -16,53 +16,83 @@
     @apply text-lg font-semibold;
   }
   dd {
-    @apply font-extralight 
+    @apply font-extralight;
   }
 
+  .container-fluid {
+    @apply mx-auto;
+    width: calc(100vw - 1rem);
+  }
+
+  .container-fluid-xl {
+    @apply mx-auto;
+    width: theme('screens.xl');
+    max-width: calc(100vw - 1rem);
+  }
+
+  .container-fluid-lg {
+    @apply mx-auto;
+    width: theme('screens.lg');
+    max-width: calc(100vw - 1rem);
+  }
+
+  .container-fluid-md {
+    @apply mx-auto;
+    width: theme('screens.md');
+    max-width: calc(100vw - 1rem);
+  }
+
+  @screen sm {
+    .container-fluid {
+      width: calc(100vw - 2rem);
+    }
+    .container-fluid-xl {
+      max-width: calc(100vw - 2rem);
+    }
+    .container-fluid-lg {
+      max-width: calc(100vw - 2rem);
+    }
+    .container-fluid-md {
+      max-width: calc(100vw - 2rem);
+    }
+  }
 }
 
-
 @layer utilities {
-
   .text-outline {
     color: white;
-    text-shadow: -.5px -.5px 0 #000, .5px -.5px 0 #000, -.5px .5px 0 #000, .5px .5px 0 #000;
+    text-shadow: -0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000;
   }
   .text-outline-1 {
     color: white;
     text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
   }
 
+  .outline1 {
+    color: black !important;
+    text-shadow: 1px 1px 0px white, 1px -1px 0px white, -1px 1px 0px white, -1px -1px 0px white;
+  }
+  .outline4 {
+    color: white !important;
+    text-shadow: 1px 1px 0px black, 1px -1px 0px black, -1px 1px 0px black, -1px -1px 0px black;
+  }
 
+  .tshadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  .text-shadow {
+    text-shadow: 2px 2px 4px black;
+  }
+  .text-shadow-md {
+    text-shadow: 4px 4px 8px black;
+  }
 
+  .tshadow-md {
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
 
-    .outline1 {
-        color: black !important;
-        text-shadow: 1px 1px 0px white, 1px -1px 0px white, -1px 1px 0px white, -1px -1px 0px white;
-    }
-    .outline4 {
-        color: white !important;
-        text-shadow: 1px 1px 0px black, 1px -1px 0px black, -1px 1px 0px black, -1px -1px 0px black;
-    }
-
-    .tshadow {
-        text-shadow: 0 2px 4px rgba(0,0,0,0.10);
-    }
-    .text-shadow {
-        text-shadow: 2px 2px 4px black;
-    }
-    .text-shadow-md {
-        text-shadow: 4px 4px 8px black;
-    }
-
-    .tshadow-md {
-        text-shadow: 0 4px 8px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
-    }
-
-  
-  
   .text-shadow-lg {
-    text-shadow: 10px 15px 30px rgba(0,0,0,0.11), 0 5px 15px rgba(0,0,0,0.08);
+    text-shadow: 10px 15px 30px rgba(0, 0, 0, 0.11), 0 5px 15px rgba(0, 0, 0, 0.08);
   }
 
   .text-shadow-none {
@@ -74,7 +104,4 @@
 
     /* text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; */
   }
-
-
-
 }

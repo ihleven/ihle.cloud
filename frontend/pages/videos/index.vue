@@ -1,12 +1,17 @@
 <template>
-  <main class="bg-neutral-200 min-h-screen">
+  <main class="min-h-screen bg-neutral-200">
     <NavigationBar />
 
-    <section class="bg-neutral-200 max-w-screen-md mx-auto pt-8 pb-16 h-full">
-      <h2 class="px-4 py-1 text-md font-bold text-neutral-600">Videos:</h2>
-      <ul class="bg-neutral-100 border-y border-neutral-300 divide-y divide-neutral-300 divide-dashed">
-        <nuxt-link v-for="video in videos" :key="video.slug" :to="`/videos/${video.slug}`" class="flex justify-between items-center cursor-pointer px-2 py-2">
-          <h3 class="text-neutral-700 text-sm font-semibold">
+    <section class="mx-auto h-full max-w-screen-md bg-neutral-200 pb-16 pt-8">
+      <h2 class="text-md px-4 py-1 font-bold text-neutral-600">Videos:</h2>
+      <ul class="divide-y divide-dashed divide-neutral-300 border-y border-neutral-300 bg-neutral-100">
+        <nuxt-link
+          v-for="video in videos"
+          :key="video.slug"
+          :to="`/videos/${video.slug}`"
+          class="flex cursor-pointer items-center justify-between px-2 py-2"
+        >
+          <h3 class="text-sm font-semibold text-neutral-700">
             {{ video.desc }}
             <!-- <small class="text-neutral-300 text-xs font-medium">{{
               video.desc
@@ -24,6 +29,6 @@
 </template>
 
 <script setup>
-const { params } = useRoute();
-const { videos } = useSuper8();
+  // const { params } = useRoute()
+  const { videos } = useSuper8()
 </script>

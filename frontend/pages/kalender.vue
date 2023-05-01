@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-neutral-200 min-h-screen">
+  <div class="min-h-screen bg-neutral-200">
     <NavigationBar target="" class="sticky top-0 w-screen" />
     <arbeit-hero class="" />
 
@@ -43,16 +43,16 @@
 </template>
 
 <script>
-// import { mapState } from 'vuex'
+  // import { mapState } from 'vuex'
 
-// import ArbeitHero from '@/components/arbeit/ArbeitHero.vue'
+  // import ArbeitHero from '@/components/arbeit/ArbeitHero.vue'
 
-export default {
-  // components: {
-  //   ArbeitHero,
-  // },
-  // computed: {
-  //   ...mapState('datum', ['jahr', 'monat', 'monatsname', 'tag', 'wochentag', 'kw']),
-  // },
-};
+  export default {
+    // components: {
+    //   ArbeitHero,
+    // },
+    // computed: {
+    //   ...mapState('datum', ['jahr', 'monat', 'monatsname', 'tag', 'wochentag', 'kw']),
+    // },
+  }
 </script>
