@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 
@@ -11,6 +13,7 @@ import (
 
 	"bitbucket.org/hotelplan/webcc-pkg/web"
 	"github.com/ihleven/errors"
+	"github.com/ihleven/ihle.cloud/hi"
 	"github.com/ihleven/pkg/hidrive"
 )
 
@@ -38,18 +41,16 @@ var (
 var nuxt *string = flag.String("nuxt", "./public", "path to nuxt .output/public")
 
 func main() {
-
-	fmt.Println("CLIENT_ID", CLIENT_ID)
-	fmt.Println("CLIENT_SECRET", CLIENT_SECRET)
-	setup()
-	// fmt.Println("drive", drive)
-	// token := drive.Token("wolfgang")
-	// fmt.Println("token", token)
-	// meta, err := drive.Meta("/", token)
-	// fmt.Println("meta", meta, err)
-
-	// usecase = kunst.NewUsecase(repo, drive)
-	// return nil
+	manager := hidrive.NewAuthManager(CLIENT_ID, CLIENT_SECRET)
+	// drive = hidrive.NewDrive(manager)
+	// hfs := (hidriveFS)(*drive)
+	// setup()
+	token, _ := manager.GetAccessToken("wolfgang")
+	hfs := hi.New(token.AccessToken)
+	srv := web.NewServer(false, web.Addr("", 10815))
+	srv.Register("/hidrive", FileServer(hfs))
+	srv.Register("/home", FileServer((dirFS)("/Users/ih")))
+	srv.Run()
 }
 
 var drive *hidrive.Drive
@@ -69,6 +70,7 @@ func setup() {
 	srv.Register("/serve", serve)
 	srv.Register("/wolfgang-ihle", serveWolfgangIhle())
 	srv.Register("/media/videos", servePrefix("videos"))
+	srv.Register("/proxy", serveReverseProxy())
 
 	srv.Run()
 }
@@ -218,5 +220,29 @@ func serveFileContents(file string, files http.FileSystem) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		http.ServeContent(w, r, fi.Name(), fi.ModTime(), index)
+	}
+}
+
+func serveReverseProxy() web.HandlerFunc {
+	return func(rw *web.ResponseWriter, r *http.Request) error {
+		token := drive.Token("wolfgang")
+		if token == nil {
+			return errors.NewWithCode(http.StatusProxyAuthRequired, "Couldn‘t get valid auth token")
+		}
+		urlstr, err := drive.Link(r.URL.Path, token)
+		fmt.Println("serveReverseProxy", r.URL.Path, urlstr, err)
+		if err != nil {
+			return errors.Wrap(err, "Couldn‘t list dir %q", r.URL.Path)
+		}
+		url, _ := url.Parse(urlstr)
+		proxy := httputil.NewSingleHostReverseProxy(url)
+
+		r.URL.Host = url.Host
+		r.URL.Scheme = url.Scheme
+		r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
+		r.Host = url.Host
+		rw.Header().Set("access-control-allow-origin", "*")
+		proxy.ServeHTTP(rw, r)
+		return nil
 	}
 }

@@ -8,10 +8,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter var", ...defaultTheme.fontFamily.sans],
-      },
-      fontFamily: {
         sans: ["InterVariable", ...defaultTheme.fontFamily.sans],
+        raleway: ["RalewayVariable", ...defaultTheme.fontFamily.sans],
         // mono: ['Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
       },
       colors: {

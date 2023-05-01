@@ -8,3 +8,7 @@ node_modules
 dist
 .DS_Store
 /cli/cld/public
+*.mgmt
+*cld
+*cloud
+*cloud-linux-amd64

@@ -1,22 +1,10 @@
 <template>
   <header class="bg-transparent backdrop-blur flex justify-start items-center">
-    <button
-      v-if="target"
-      class="py-2 flex items-center justify-start text-neutral-100 focus:outline-none"
-      @click="goback"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="h-8 w-8 stroke-current stroke-2 fill-none"
-      >
+    <button v-if="target" class="py-2 flex items-center justify-start focus:outline-none" @click="goback">
+      <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-8 w-8 stroke-current stroke-2 fill-none">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
-      <span class="-m-1 tracking-tighter text-md font-medium">{{
-        target
-      }}</span>
+      <span class="-m-1 tracking-tighter text-md font-medium">{{ target }}</span>
     </button>
 
     <Logo v-else />

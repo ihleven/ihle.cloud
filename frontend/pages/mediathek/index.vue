@@ -1,11 +1,12 @@
 <template>
   <main class="w-screen grid grid-cols-2">
-    <section class="bg-ral-7035 col-span-2 aspect-[2/1] flex items-center justify-center">
-      <Logo />
-    </section>
-
-    <nuxt-link to="/videos" class="bg-blue-500 bg-opacity-90 p-8 aspect-square">
-      <h1 class="text-white text-lg font-black hover:text-outline">Videos</h1>
+    <NavigationBar /><i></i>
+    <nuxt-link to="/mediathek/Die-Erben-der-Saurier/1.1-Eine-neue-Zeit">
+      <article
+        class="p-8 aspect-square text-white bg-sky-300 text-lg font-black hover:text-outline bg-[url('/api/proxy/public/mediathek/Die-Erben-der-Saurier/cover.jpg')] bg-cover bg-center bg-no-repeat"
+      >
+        Die Erben der Saurier
+      </article>
     </nuxt-link>
 
     <section class="bg-green-500 bg-opacity-90 aspect-square">
@@ -28,7 +29,5 @@
     <section class="bg-cyan-300 bg-opacity-80 aspect-square"></section>
   </main>
 </template>
-<script setup>
-const env = process.env.NODE_ENV;
-const dev = env === "development";
-</script>
+
+<script setup></script>

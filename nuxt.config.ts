@@ -4,6 +4,9 @@ export default defineNuxtConfig({
   // app: {
   //     pageTransition: { name: 'page', mode: 'out-in' }
   //   },
+
+  css: ["v-calendar/dist/style.css"],
+
   modules: [
     "@nuxt/content",
     "@nuxtjs/tailwindcss",
@@ -36,6 +39,6 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    apiBaseUrl: "",
+    apiBaseUrl: "http://localhost:10815",
   },
 });

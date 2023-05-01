@@ -5,12 +5,20 @@ export default defineNuxtRouteMiddleware((to, from) => {
   const toDepth = getDepth(to.path);
   const fromDepth = getDepth(from.path);
 
-  if (toDepth > fromDepth) {
-    to.meta.pageTransition = { name: "page-left" };
-    from.meta.pageTransition = { name: "page-left" };
-  } else {
-    to.meta.pageTransition = { name: "page-right" };
-    from.meta.pageTransition = { name: "page-right" };
+  if (!to.path.startsWith("/kalender")) {
+    if (toDepth > fromDepth) {
+      to.meta.pageTransition = { name: "page-left" };
+      from.meta.pageTransition = { name: "page-left" };
+    } else {
+      to.meta.pageTransition = { name: "page-right" };
+      from.meta.pageTransition = { name: "page-right" };
+    }
   }
-  console.log("middleware", fromDepth, toDepth, to.meta.pageTransition);
+  // console.log(
+  //   "transition",
+  //   fromDepth,
+  //   toDepth,
+  //   to.meta.pageTransition,
+  //   to.path
+  // );
 });
