@@ -929,7 +929,7 @@
     read-package-json-fast "^3.0.0"
     which "^3.0.0"
 
-"@nuxt/content@latest":
+"@nuxt/content@^2.6.0":
   version "2.6.0"
   resolved "https://registry.yarnpkg.com/@nuxt/content/-/content-2.6.0.tgz#edd414dcf7a97e612ced50ca082ddbdf985754ab"
   integrity sha512-iwZ5NY6m2MNBAFaRp5OSjRdd+vk/XFbBqN0wtmpFtcoYHyzpUxy2fU38KWnXXmgP7Vi4mFOJ8SExZnL0cdlEtQ==
@@ -7236,6 +7236,11 @@ perfect-debounce@^0.1.3:
   version "0.1.3"
   resolved "https://registry.yarnpkg.com/perfect-debounce/-/perfect-debounce-0.1.3.tgz#ff6798ea543a3ba1f0efeeaf97c0340f5c8871ce"
   integrity sha512-NOT9AcKiDGpnV/HBhI22Str++XWcErO/bALvHCuhv33owZW/CjH8KAFLZDCmu3727sihe0wTxpDhyGc6M8qacQ==
+
+photoswipe@^5.3.7:
+  version "5.3.7"
+  resolved "https://registry.yarnpkg.com/photoswipe/-/photoswipe-5.3.7.tgz#c67df67aaddb5705bcf8ff265bd2086f57805756"
+  integrity sha512-zsyLsTTLFrj0XR1m4/hO7qNooboFKUrDy+Zt5i2d6qjFPAtBjzaj/Xtydso4uxzcXpcqbTmyxDibb3BcSISseg==
 
 picocolors@^1.0.0:
   version "1.0.0"

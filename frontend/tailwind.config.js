@@ -8,7 +8,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['InterVariable', ...defaultTheme.fontFamily.sans],
+        sans: ['iA Writer', ...defaultTheme.fontFamily.sans],
+        // sans: ['InterVariable', ...defaultTheme.fontFamily.sans],
         raleway: ['RalewayVariable', ...defaultTheme.fontFamily.sans],
         // mono: ['Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
       },

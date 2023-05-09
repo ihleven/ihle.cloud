@@ -41,16 +41,16 @@ var (
 var nuxt *string = flag.String("nuxt", "./public", "path to nuxt .output/public")
 
 func main() {
-	manager := hidrive.NewAuthManager(CLIENT_ID, CLIENT_SECRET)
+	// manager := hidrive.NewAuthManager(CLIENT_ID, CLIENT_SECRET)
 	// drive = hidrive.NewDrive(manager)
 	// hfs := (hidriveFS)(*drive)
-	// setup()
-	token, _ := manager.GetAccessToken("wolfgang")
-	hfs := hi.New(token.AccessToken)
-	srv := web.NewServer(false, web.Addr("", 10815))
-	srv.Register("/hidrive", FileServer(hfs))
-	srv.Register("/home", FileServer((dirFS)("/Users/ih")))
-	srv.Run()
+	setup()
+	// token, _ := manager.GetAccessToken("wolfgang")
+	// hfs := hi.New(token.AccessToken)
+	// srv := web.NewServer(false, web.Addr("", 10815))
+	// srv.Register("/hidrive", FileServer(hfs))
+	// srv.Register("/home", FileServer((dirFS)("/Users/ih")))
+	// srv.Run()
 }
 
 var drive *hidrive.Drive
@@ -71,6 +71,12 @@ func setup() {
 	srv.Register("/wolfgang-ihle", serveWolfgangIhle())
 	srv.Register("/media/videos", servePrefix("videos"))
 	srv.Register("/proxy", serveReverseProxy())
+	srv.Register("/thumbs", thumbs)
+
+	// neu
+	hfs := hi.New(t.AccessToken)
+	srv.Register("/hidrive-new", FileServer(hfs))
+	srv.Register("/home", FileServer((dirFS)("/Users/ih")))
 
 	srv.Run()
 }
@@ -108,6 +114,19 @@ func serve(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	drive.Serve(rw, r2)
+}
+
+func thumbs(rw http.ResponseWriter, r *http.Request) {
+
+	ctx := context.WithValue(context.Background(), "username", "wolfgang")
+	r2 := r.WithContext(ctx)
+	fmt.Println("path:", r.URL.RawPath)
+	token := drive.Token("wolfgang")
+	if token == nil {
+		// return errors.NewWithCode(http.StatusProxyAuthRequired, "Couldn‘t get valid auth token")
+	}
+	fmt.Println("params in handler:", r.URL.Query())
+	drive.ThumbHandler(rw, r2)
 }
 
 func serveWolfgangIhle() web.HandlerFunc {

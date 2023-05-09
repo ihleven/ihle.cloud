@@ -14,7 +14,7 @@ export default defineNuxtConfig({
 
     //    "@kevinmarrec/nuxt-pwa",
     //    "nuxt-icon",
-    //    "nuxt-icons", //https://github.com/gitFoxCode/nuxt-icons
+    'nuxt-icons', // https://github.com/gitFoxCode/nuxt-icons => <nuxt-icon name="mySuperIcon" filled />
   ],
 
   content: {
