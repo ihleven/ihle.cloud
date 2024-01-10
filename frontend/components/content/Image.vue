@@ -11,5 +11,5 @@
 
   const basePath = inject('basePath', '/')
   const dirPath = inject('dirPath', '')
-  const src = `${basePath}/${dirPath}/${props.src}`
+  const src = props.src.startsWith('/') ? `${basePath}${props.src}` : `${basePath}/${dirPath}/${props.src}`
 </script>

@@ -3,7 +3,8 @@ import { defineEventHandler, getCookie, getHeaders, getMethod, getQuery, readBod
 export default defineEventHandler(event => {
   const { apiBaseUrl } = useRuntimeConfig()
   const url = event.node.req.url as string
-  const target = new URL(url.slice(4), apiBaseUrl)
+  // const target = new URL(url.slice(4), apiBaseUrl)
+  const target = new URL(url, apiBaseUrl)
 
   // const target = new URL(event.node.req.url, apiBaseUrl)
 

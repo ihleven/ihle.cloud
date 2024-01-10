@@ -13,7 +13,7 @@ export default defineNuxtConfig({
     '@nuxtjs/supabase',
 
     //    "@kevinmarrec/nuxt-pwa",
-    //    "nuxt-icon",
+    'nuxt-icon', // das offizielle?
     'nuxt-icons', // https://github.com/gitFoxCode/nuxt-icons => <nuxt-icon name="mySuperIcon" filled />
   ],
 
@@ -47,4 +47,8 @@ export default defineNuxtConfig({
   },
 
   devtools: false,
+
+  routeRules: {
+    '/content-api/v1/**': { proxy: { to: 'http://localhost:8000/content-api/v1/**' } },
+  },
 })

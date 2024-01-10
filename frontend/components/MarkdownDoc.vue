@@ -10,7 +10,7 @@
       <ContentRenderer :value="doc" class="prose max-w-none prose-p:text-justify" />
     </main>
 
-    <footer class="w-full bg-violet-200">c</footer>
+    <footer class="w-full bg-violet-200">footer</footer>
   </article>
 </template>
 

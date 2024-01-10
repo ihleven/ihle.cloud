@@ -33,10 +33,11 @@
   const dir = dirname(path)
 
   const { data } = await useFetch(`/api/home/${path}`)
+  console.log('meta:', data.value)
 
   const doc = await markdownParser.parse(`<some-id>`, data.value)
   // Extract the filename:
-  provide('basePath', `http://localhost:10815/home`)
+  provide('basePath', `/api/home`)
   provide('dirPath', dir)
 
   const isOpen = ref(false)

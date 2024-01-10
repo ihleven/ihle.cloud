@@ -16,7 +16,7 @@
 
     <section class="aspect-square bg-sky-500 bg-opacity-80">
       <nuxt-link
-        v-if="dev"
+        v-if="true"
         to="/mediathek"
         class="hover:text-outline block h-full w-full p-8 text-lg font-extralight text-white hover:font-normal"
         >Mediathek
@@ -28,7 +28,9 @@
       </dl> -->
     </section>
 
-    <section class="aspect-square bg-cyan-300 bg-opacity-80"></section>
+    <nuxt-link to="/musik" class="relative aspect-square bg-cyan-300 bg-opacity-80">
+      <h1 class="hover:text-outline absolute inset-8 text-lg font-black text-white">Musik</h1>
+    </nuxt-link>
   </main>
 </template>
 <script setup>

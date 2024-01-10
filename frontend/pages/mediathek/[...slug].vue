@@ -20,9 +20,10 @@
       </video>
     </section>
 
-    <section class="mx-auto max-w-screen-md pb-16 pt-8">
+    <section class="mx-auto min-h-screen max-w-screen-md pb-16 pt-8">
       <!-- <h2 class="px-4 py-1 text-md font-bold text-neutral-600">Kapitel:</h2> -->
-
+      chapters: {{ chapters }}
+      <button @click="playPause">play/pause</button>
       <ul class="border-y border-neutral-300 bg-neutral-700 text-neutral-300">
         <li v-for="file in dir.members" :key="file.id">
           <nuxt-link
@@ -47,13 +48,14 @@
 
 <script setup>
   const { params } = useRoute()
-  console.log('params:', params)
-  const prefix = 'http://localhost:10815/proxy/public/mediathek/'
+
+  const prefix = '/api/raw/public/mediathek/'
+
   const videoElem = ref({})
   const time = ref(0)
-
   const chapters = ref([])
   const active = ref({})
+
   onMounted(() => {
     const track = videoElem.value.textTracks[0]
     if (track) {
@@ -97,6 +99,10 @@
     return { src: prefix + params.slug.join('/') + '.Creator2160p60.mp4' }
   })
 
-  const { data: dir, refresh } = await useFetch(`/api/hidrive/public/mediathek/${params.slug[0]}`, { server: false })
+  // const { data: dir, refresh } = await useFetch(`/api/hidrive/public/mediathek/${params.slug[0]}`, { server: false })
+  const { data: dir } = await useFetch(`/api/meta/public/mediathek/${params.slug[0]}`, {
+    server: false,
+    headers: { Accept: 'application/json' },
+  })
   console.log('dir', dir)
 </script>

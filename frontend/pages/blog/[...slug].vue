@@ -19,4 +19,5 @@
   const path = computed(() => {
     return route.params.slug ? route.params.slug.join('/') : ''
   })
+  console.log('path', path)
 </script>

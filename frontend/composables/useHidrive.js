@@ -1,6 +1,6 @@
 // import { useState } from '#app'
 
-export default async function () {
+export default function () {
   const route = useRoute()
 
   const path = computed(() => route.params.slug.join('/'))

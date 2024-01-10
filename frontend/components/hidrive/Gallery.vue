@@ -1,22 +1,20 @@
 <template>
-  <div
-    :id="gallery"
-    class="grid grid-cols-[repeat(auto-fit,_minmax(100px,_1fr))] gap-1 border-b border-t border-gray-300 bg-white p-1"
-  >
+  <div :id="gallery" class="grid grid-cols-[repeat(auto-fill,_minmax(128px,_1fr))] gap-1 bg-white p-1" @keyup="next">
     <a
-      v-for="(image, key) in files"
-      :key="image.id"
-      :href="'/api/serve' + image.path"
-      :data-pswp-width="image.image.width"
-      :data-pswp-height="image.image.height"
+      v-for="f in files"
+      :key="f.id"
+      :href="'/api/raw' + f.path"
+      :data-pswp-width="f.image.width"
+      :data-pswp-height="f.image.height"
       data-cropped="true"
       target="_blank"
       rel="noreferrer"
-      class="= aspect-square"
+      class="aspect-square"
     >
-      <img :src="'/api/thumbs' + image.path + '?width=200'" :alt="image.name" class="h-full w-full object-cover" />
+      <img :src="'/api/thumbs?path=' + f.path + '&width=200'" :alt="f.name" class="h-full w-full object-cover" />
     </a>
   </div>
+  <!-- <Keypress key-event="keyup" :key-code="13" @success="next" /> -->
 </template>
 
 <script setup>
@@ -45,4 +43,17 @@
       lightbox.value = null
     }
   })
+
+  function next(event) {
+    switch (event.key) {
+      case 'Meta':
+        lightbox.value.pswp.next()
+        break
+      case 'Shift':
+        lightbox.value.pswp.prev()
+        break
+      default:
+        break
+    }
+  }
 </script>

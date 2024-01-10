@@ -3,7 +3,7 @@
     <NavigationBar /><i></i>
     <nuxt-link to="/mediathek/Die-Erben-der-Saurier/1.1-Eine-neue-Zeit">
       <article
-        class="hover:text-outline aspect-square bg-sky-300 bg-[url('/api/proxy/public/mediathek/Die-Erben-der-Saurier/cover.jpg')] bg-cover bg-center bg-no-repeat p-8 text-lg font-black text-white"
+        class="hover:text-outline aspect-square bg-sky-300 bg-[url('/api/raw/public/mediathek/Die-Erben-der-Saurier/cover.jpg')] bg-cover bg-center bg-no-repeat p-8 text-lg font-black text-white"
       >
         Die Erben der Saurier
       </article>
