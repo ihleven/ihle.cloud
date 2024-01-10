@@ -8,15 +8,17 @@ replace github.com/ihleven/errors v0.1.0 => ../../../src/errors
 
 require (
 	bitbucket.org/hotelplan/webcc-pkg v0.0.1
+	github.com/alexflint/go-arg v1.4.3
+	github.com/dhowden/tag v0.0.0-20230630033851-978a0926ee25
 	github.com/ihleven/errors v0.1.0
 	github.com/ihleven/pkg v0.4.0-alpha
-	github.com/spf13/pflag v1.0.5
 )
 
 require (
 	atomicgo.dev/cursor v0.1.1 // indirect
 	atomicgo.dev/keyboard v0.2.8 // indirect
 	github.com/DataDog/gostackparse v0.6.0 // indirect
+	github.com/alexflint/go-scalar v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/containerd/console v1.0.3 // indirect

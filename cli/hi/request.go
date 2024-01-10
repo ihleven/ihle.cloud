@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/ihleven/pkg/errors"
 )
@@ -61,6 +62,19 @@ func path(value string) Option {
 	}
 }
 
+func rangeHeader(rangeFrom, rangeTo int) Option {
+	return func(req *Request) {
+		if rangeFrom == 0 && rangeTo == 0 {
+			return
+		}
+		hd := "bytes=" + strconv.Itoa(rangeFrom) + "-"
+		if rangeTo != 0 {
+			hd += strconv.Itoa(rangeTo)
+		}
+		req.Headers["Range"] = hd
+	}
+}
+
 // Type: string
 // A comma-separated list of value types that will be included in the response.
 // The performance of the call might be influenced by the amount of information requested.
@@ -69,7 +83,6 @@ func path(value string) Option {
 func fields(value string) Option {
 	return func(req *Request) {
 		if value != "" {
-			fmt.Println("settign fields", value)
 			req.Params.Set("fields", value)
 		}
 	}
@@ -78,6 +91,15 @@ func fields(value string) Option {
 func Header(header, value string) Option {
 	return func(req *Request) {
 		req.Headers[header] = value
+	}
+}
+
+func HiHeaders(header http.Header) Option {
+	return func(req *Request) {
+		for k, v := range header {
+
+			req.Headers[k] = v[0]
+		}
 	}
 }
 
@@ -125,14 +147,11 @@ func Dump(r *http.Request) string {
 func (rq *Request) Exec(client *http.Client) (*http.Response, error) {
 
 	// calculating url
+	rq.URL = "https://api.hidrive.strato.com/2.1" + rq.URL
 	if len(rq.Params) > 0 {
-		rq.URL = "https://api.hidrive.strato.com/2.1" + rq.URL + "?" + rq.Params.Encode()
+		rq.URL += "?" + rq.Params.Encode()
 	}
-	// var body io.Reader
-	// if len(rq.Body) != 0 {
-	// 	body = bytes.NewReader(rq.Body)
-	// }
-	// preparing *http.Request
+
 	request, err := http.NewRequestWithContext(context.Background(), rq.Method, rq.URL, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn‘t create %s %s http request", rq.Method, rq.URL)
@@ -161,24 +180,43 @@ func (rq *Request) Exec(client *http.Client) (*http.Response, error) {
 		return nil, errors.WrapWithCode(err, 502, "HTTP client couldn't Do request: %s -> %s", Dump(request), err.Error())
 	}
 
+	if resp.StatusCode >= 300 {
+		defer resp.Body.Close()
+
+		err := Error{Status: resp.StatusCode}
+		json.NewDecoder(resp.Body).Decode(&err)
+		// if err != nil {
+		// 	return errors.NewWithCode(500, "parse error")
+		// }
+
+		return nil, &err
+	}
 	return resp, nil
 }
 
-func (rq *Request) fetchJSON(client *http.Client) (*meta, *Error) {
+func (rq *Request) fetchJSON(client *http.Client) (*Meta, error) {
 
 	response, err := rq.Exec(client)
 	if err != nil {
-
+		return nil, err
 	}
 	defer response.Body.Close()
-	bytes, err := io.ReadAll(response.Body)
+	// bytes, err := io.ReadAll(response.Body)
+	// if err != nil {
+	// 	return nil, &Error{Message: err.Error()}
+	// }
+	// var meta Meta
+	// err = json.Unmarshal(bytes, &meta)
+	// if err != nil {
+	// 	return nil, &Error{Message: err.Error()}
+	// }
+	// return &meta, nil
+
+	var meta Meta
+	err = json.NewDecoder(response.Body).Decode(&meta)
 	if err != nil {
-		return nil, &Error{Message: err.Error()}
-	}
-	var meta meta
-	err = json.Unmarshal(bytes, &meta)
-	if err != nil {
-		return nil, &Error{Message: err.Error()}
+		fmt.Println("decoding ERROR", err.Error())
+		return nil, err
 	}
 	return &meta, nil
 }

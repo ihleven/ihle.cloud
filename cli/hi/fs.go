@@ -20,23 +20,16 @@ type Drive struct {
 	write_perm []string
 }
 
+// Open implements fs.FS interface
 func (hd *Drive) Open(name string) (fs.File, error) {
 
-	c := NewHDClient(hd.token)
-	meta, err := c.GetMeta(name)
+	meta, err := (&hdclient{"", hd.token}).GetMeta(name)
 	if err != nil {
 		return nil, errors.Wrap(err, "Couldn‘t list dir %q", name)
 	}
+	meta.accessToken = hd.token
 
-	// if meta.Filetype == "dir" {
-	// 	meta.Members, err = drive.Listdir(r.URL.Path, token)
-	// 	if err != nil {
-	// 		return errors.Wrap(err, "Couldn‘t list dir %q", r.URL.Path)
-	// 	}
-	// }
-
-	return &File{meta: meta, fsys: c}, nil
-
+	return meta, nil
 }
 
 // ReadDir reads the named directory
@@ -49,8 +42,8 @@ func (hd *Drive) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, errors.Wrap(err, "Couldn‘t list dir %q", name)
 	}
 	dirEntries := make([]fs.DirEntry, len(meta.Members))
-	for i, e := range meta.Members {
-		dirEntries[i] = &e
+	for i := range meta.Members {
+		dirEntries[i] = &meta.Members[i]
 	}
 	return dirEntries, nil
 }
@@ -65,7 +58,7 @@ func (hd *Drive) ReadDir(name string) ([]fs.DirEntry, error) {
 // }
 
 type File struct {
-	meta *meta
+	meta *Meta
 	fsys *hdclient
 	// reader *bytes.Reader
 }

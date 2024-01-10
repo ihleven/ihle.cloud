@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	flag "github.com/spf13/pflag"
+	"github.com/alexflint/go-arg"
 
 	"bitbucket.org/hotelplan/webcc-pkg/web"
 	"github.com/ihleven/errors"
@@ -23,6 +23,18 @@ var (
 	CLIENT_ID     string
 	CLIENT_SECRET string
 )
+
+type Command struct {
+	Flags
+}
+
+type Flags struct {
+	Port         int    `arg:"-p,--port,env"       default:"10815"          help:"Port numbe"`
+	Debug        bool   `arg:"-d,--debug,env"      default:"false"          help:"Enable debug mode"`
+	Pretty       bool   `arg:"--pretty,env:LOG_PRETTY"                      help:"Enable pretty logging"`
+	Verbose      bool   `arg:"-v,--verbose,env"                             help:"Enable verbose mode"`
+	FrontendPath string `arg:"--frontend-path,env" default:".output/public" help:"path to nuxt .output/public"`
+}
 
 // func nuxtHandler() http.Handler {
 
@@ -38,45 +50,46 @@ var (
 // 	// return intercept404(fileServer, serveIndex)
 // }
 
-var nuxt *string = flag.String("nuxt", "./public", "path to nuxt .output/public")
-
 func main() {
-	// manager := hidrive.NewAuthManager(CLIENT_ID, CLIENT_SECRET)
-	// drive = hidrive.NewDrive(manager)
+
+	var cmd Command
+
+	arg.MustParse(&cmd)
+
 	// hfs := (hidriveFS)(*drive)
-	setup()
-	// token, _ := manager.GetAccessToken("wolfgang")
-	// hfs := hi.New(token.AccessToken)
-	// srv := web.NewServer(false, web.Addr("", 10815))
-	// srv.Register("/hidrive", FileServer(hfs))
-	// srv.Register("/home", FileServer((dirFS)("/Users/ih")))
-	// srv.Run()
+	cmd.run()
 }
 
 var drive *hidrive.Drive
 
-func setup() {
+func (cmd *Command) run() {
 
-	fmt.Println(CLIENT_ID)
-	fmt.Println(CLIENT_SECRET)
+	fmt.Println("CLIENT_ID:", CLIENT_ID)
+	fmt.Println("CLIENT_SECRET:", CLIENT_SECRET)
 	manager := hidrive.NewAuthManager(CLIENT_ID, CLIENT_SECRET)
 	t, e := manager.GetAccessToken("wolfgang")
 	drive = hidrive.NewDrive(manager)
 	fmt.Println("token:", drive.Token("wolfgang"), e, t)
-	srv := web.NewServer(false, web.Addr("", 10815))
 
-	srv.Register("/", asdf(*nuxt))
-	srv.Register("/hidrive", handler)
-	srv.Register("/serve", serve)
-	srv.Register("/wolfgang-ihle", serveWolfgangIhle())
-	srv.Register("/media/videos", servePrefix("videos"))
+	srv := web.NewServer(false, web.Addr("", cmd.Port))
+	//
+	srv.Register("/", serveSPA(cmd.FrontendPath)) // serve prerendred nuxt app
+	// srv.Register("/hidrive", handler)                    //
+	srv.Register("/serve", serve)                        //
+	srv.Register("/wolfgang-ihle", serveWolfgangIhle())  // used for catalogs on wolfgang-ihle.de
+	srv.Register("/media/videos", servePrefix("videos")) // used for serving local video on opalstack
 	srv.Register("/proxy", serveReverseProxy())
-	srv.Register("/thumbs", thumbs)
+	// srv.Register("/thumbs", thumbs) //
 
 	// neu
 	hfs := hi.New(t.AccessToken)
+	srv.Register("/api/meta", hi.MetaHandler("", *t))
+	srv.Register("/api/raw", hi.FileHandler("", *t))
+	srv.Register("/api/thumbs", hi.ThumbHandler(t.AccessToken))
+	srv.Register("/api/hidrive", FileServer(hfs))
 	srv.Register("/hidrive-new", FileServer(hfs))
-	srv.Register("/home", FileServer((dirFS)("/Users/ih")))
+	srv.Register("/api/home", FileServer((dirFS)("/Users/ih")))
+	srv.Register("/api/tag", hi.TagsHandler(t.AccessToken, hfs))
 
 	srv.Run()
 }
@@ -84,6 +97,7 @@ func setup() {
 func handler(rw *web.ResponseWriter, r *http.Request) error {
 
 	token := drive.Token("wolfgang")
+	fmt.Println("token:", token)
 	if token == nil {
 		return errors.NewWithCode(http.StatusProxyAuthRequired, "Couldn‘t get valid auth token")
 	}
@@ -116,18 +130,18 @@ func serve(rw http.ResponseWriter, r *http.Request) {
 	drive.Serve(rw, r2)
 }
 
-func thumbs(rw http.ResponseWriter, r *http.Request) {
+// func thumbs(rw http.ResponseWriter, r *http.Request) {
 
-	ctx := context.WithValue(context.Background(), "username", "wolfgang")
-	r2 := r.WithContext(ctx)
-	fmt.Println("path:", r.URL.RawPath)
-	token := drive.Token("wolfgang")
-	if token == nil {
-		// return errors.NewWithCode(http.StatusProxyAuthRequired, "Couldn‘t get valid auth token")
-	}
-	fmt.Println("params in handler:", r.URL.Query())
-	drive.ThumbHandler(rw, r2)
-}
+// 	ctx := context.WithValue(context.Background(), "username", "wolfgang")
+// 	// r2 := r.WithContext(ctx)
+// 	// fmt.Println("path:", r.URL.RawPath)
+// 	// token := drive.Token("wolfgang")
+// 	// if token == nil {
+// 	// return errors.NewWithCode(http.StatusProxyAuthRequired, "Couldn‘t get valid auth token")
+// 	// }
+// 	fmt.Println("params in handler:", r.URL.Query())
+// 	drive.ThumbHandler(rw, r.WithContext(ctx))
+// }
 
 func serveWolfgangIhle() web.HandlerFunc {
 
@@ -169,7 +183,7 @@ func servePrefix(prefix string) web.HandlerFunc {
 	}
 }
 
-func asdf(path string) http.Handler {
+func serveSPA(path string) http.Handler {
 	fs := http.Dir(path)
 	fileServer := http.FileServer(fs)
 	serveIndex := serveFileContents("index.html", fs)
@@ -177,6 +191,7 @@ func asdf(path string) http.Handler {
 	return intercept404(fileServer, serveIndex)
 }
 
+// https://hackandsla.sh/posts/2021-11-06-serve-spa-from-go/
 type hookedResponseWriter struct {
 	http.ResponseWriter
 	got404 bool
@@ -199,6 +214,7 @@ func (hrw *hookedResponseWriter) Write(p []byte) (int, error) {
 
 	return hrw.ResponseWriter.Write(p)
 }
+
 func intercept404(handler, on404 http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hookedWriter := &hookedResponseWriter{ResponseWriter: w}

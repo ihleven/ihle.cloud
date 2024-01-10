@@ -28,7 +28,7 @@ func FileServer(fsys fs.FS) web.HandlerFunc {
 		if err != nil {
 			return err
 		}
-
+		fmt.Printf("%T\n", stat.Sys())
 		if stat.IsDir() {
 			readDirFile, _ := file.(fs.ReadDirFile)
 
@@ -39,12 +39,16 @@ func FileServer(fsys fs.FS) web.HandlerFunc {
 			sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 
 			switch r.Header.Get("Accept") {
+
 			case "application/json":
-				bytes, err := json.MarshalIndent(entries, "", "    ")
-				if err != nil {
-					return err
-				}
-				rw.Write(bytes)
+				// m := stat.Sys().(*hi.Meta)
+				// f := struct {
+				// 	*hi.Meta
+				// 	Entries []fs.DirEntry `json:"members"`
+				// }{Meta: m, Entries: entries}
+
+				rw.RespondJSON(readDirFile)
+
 			default:
 				// dirList(rw, stat.Name(), entries)
 				rw.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -65,14 +69,15 @@ func FileServer(fsys fs.FS) web.HandlerFunc {
 
 		switch r.Header.Get("Accept") {
 		case "application/json":
-			bytes, err := json.MarshalIndent(file, "", "    ")
-			if err != nil {
-				return err
-			}
-			rw.Write(bytes)
+			// bytes, err := json.MarshalIndent(stat.Sys(), "", "    ")
+			// if err != nil {
+			// 	return err
+			// }
+			rw.RespondJSON(stat.Sys())
 		default:
 
 			if seeker, ok := file.(io.ReadSeeker); ok {
+				fmt.Println("using servecontent-> ", stat.Name(), stat.ModTime())
 				http.ServeContent(rw, r, stat.Name(), stat.ModTime(), seeker)
 			} else {
 				written, err := io.Copy(rw, file)
