@@ -8,9 +8,7 @@ import (
 	"github.com/ihleven/errors"
 )
 
-var client = http.Client{
-	Timeout: 100 * time.Second,
-}
+var client = http.Client{Timeout: 100 * time.Second}
 
 func NewHDClient(token string) *hdclient {
 

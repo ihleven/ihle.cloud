@@ -5,12 +5,31 @@ prefix: toBeDefinedLater
 
 # ihle.cloud
 
+Unter api.ihle.cloud oder ihle.cloud/(content-)api soll die zentrale api für verschiedene Frontends liegen:
+- texte
+- geheimtipp archiv
+- art 
+- ...
+
 Frontend mit `yarn dev` und Backend mit `make run` starten, dann folgende Seite aufrufen: http://localhost:3000/tmp/ihle.cloud/README.md
 
-# Headline level eins
+# Backend
 
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. 
+### pkg hi
 
+lib für Zugirff auf das Hidrive
+-> handler gehören in andere Paket
+
+## cli
+
+* alte api, wird aktuell  durch /backend ersetzt
+* main in pkg cld
+* altes hi pkg, noch nicht gelöscht weil z.b. noch readseeker impl, evtl.  übernehmen in backend/hi
+  * schlecht: type Meta mit accesstoken, readindex und data bytes
+
+# Token-basierte Auth
+
+Frontend: Account- und Tokenbasierte Anmeldung => sorgt für Cookie innerhalb der Nodeapp
 
 
 ::image{src='../../Pictures/wallpapers/Bamboo.jpg' alt='alt image'} 

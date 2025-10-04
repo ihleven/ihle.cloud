@@ -1,0 +1,189 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+@plugin '@tailwindcss/typography';
+
+
+
+@theme static {
+  --font-inter: "Inter";
+  --font-mono: "iA Writer Mono";
+  --font-duo: "iA Writer Duo";
+  --font-quattro: "iA Writer Quattro";
+
+  --text-shadow-outline-black: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  --text-shadow-outline-black-thin: -0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000;
+
+  --text-xxs: 0.6875rem;
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 1.5rem; 
+  --text-3xs--letter-spacing: 0.125rem; 
+  --text-3xs--font-weight: 500; 
+
+
+   /*  
+    --bg-elevated: var(--ui-color-neutral-100); */
+  /* --ui-primary: var(--ui-color-primary-400);
+  --ui-cta: var(--ui-color-cta-300);
+
+  --ui-text: var(--ui-color-neutral-900); */
+
+  /* --ui-radius: var(--radius-sm); */
+
+  --color-green-50: #EFFDF5;
+  --color-green-100: #D9FBE8;
+  --color-green-200: #B3F5D1;
+  --color-green-300: #75EDAE;
+  --color-green-400: #00DC82;
+  --color-ral-5000: #00C16A;
+  --color-green-600: #00A155;
+  --color-green-700: #007F45;
+  --color-green-800: #016538;
+  --color-green-900: #0A5331;
+  --color-green-950: #052E16;
+
+
+  --color-ral-9001: #e9e0d2; /* Cremeweiß */
+  --color-ral-9002: #d7d5cb; /* Grauweiß */
+  --color-ral-9003: #ecece7; /* Signalweiß */
+  --color-ral-9004: #2b2b2c; /* Signalschwarz */
+  --color-ral-9005: #0e0e10; /* Tiefschwarz */
+  --color-ral-9006: #a1a1a0; /* Weißaluminium   9006 + 9007 Farben stammen aus dem Korrosionsschutzprogramm der ehemaligen Reichsbahn (Deutsche Bundes Eisenbahn). */
+  --color-ral-9007: #878581; /* Graualuminium */
+  --color-ral-9010: #f1ece1; /* Reinweiß */
+  --color-ral-9011: #27292b; /* Graphitschwarz */
+  --color-ral-9016: #f1f0ea; /* Verkehrsweiß */
+  --color-ral-9017: #2a292a; /* Verkehrsschwarz */
+  --color-ral-9018: #c8cbc4; /* Papyrusweiß */
+  --color-ral-9022: #858583; /* Perlhellgrau */
+  --color-ral-9023: #797b7a; /* Perldunkelgrau */
+ /* Farbe der Kategorie Grautöne, Teil der Sammlung RAL Classic.*/
+  --color-ral-7000: #7a888e; /* Fehgrau */
+  --color-ral-7001: #8c969d; /* Silbergrau */
+  --color-ral-7002: #817863; /* Olivgrau */
+  --color-ral-7003: #7a7669; /* Moosgrau */
+  --color-ral-7004: #9b9b9b; /* Signalgrau */
+  --color-ral-7005: #6c6e6b; /* Mausgrau */
+  --color-ral-7006: #766a5e; /* Beigegrau */
+  --color-ral-7008: #745e3d; /* Khakigrau */
+  --color-ral-7009: #5d6058; /* Grüngrau */
+  --color-ral-7010: #585c56; /* Zeltgrau */
+  --color-ral-7011: #52595d; /* Eisengrau */
+  --color-ral-7012: #575d5e; /* Basaltgrau */
+  --color-ral-7013: #575044; /* Braungrau */
+  --color-ral-7015: #4f5358; /* Schiefergrau */
+  --color-ral-7016: #383e42; /* Anthrazitgrau */
+  --color-ral-7021: #2f3234; /* Schwarzgrau */
+  --color-ral-7022: #4c4a44; /* Umbragrau */
+  --color-ral-7023: #808076; /* Betongrau */
+  --color-ral-7024: #45494e; /* Graphitgrau */
+  --color-ral-7026: #374345; /* Granitgrau */
+  --color-ral-7030: #928e85; /* Steingrau */
+  --color-ral-7031: #5b686d; /* Blaugrau */
+  --color-ral-7032: #b5b0a1; /* Kieselgrau */
+  --color-ral-7033: #7f8274; /* Zementgrau */
+  --color-ral-7034: #92886f; /* Gelbgrau */
+  --color-ral-7035: #c5c7c4; /* Lichtgrau */
+  --color-ral-7036: #979392; /* Platingrau */
+  --color-ral-7037: #7a7b7a; /* Staubgrau */
+  --color-ral-7038: #b0b0a9; /* Achatgrau */
+  --color-ral-7039: #6b665e; /* Quarzgrau */
+  --color-ral-7040: #989ea1; /* Fenstergrau */
+  --color-ral-7042: #8e9291; /* Verkehrsgrau A */
+  --color-ral-7043: #4f5250; /* Verkehrsgrau B */
+  --color-ral-7044: #b7b3a8; /* Seidengrau */
+  --color-ral-7045: #8d9295; /* Telegrau 1 */
+  --color-ral-7046: #7f868a; /* Telegrau 2 */
+  --color-ral-7047: #c8c8c7; /* Telegrau 4 */
+  --color-ral-7048: #817b73; /* Perlmausgrau */
+
+   /* h1 {
+    @apply text-2xl font-bold;
+  }
+  h2 {
+    @apply text-xl font-semibold;
+  }
+  dl {
+    @apply text-lg;
+  }
+  dt {
+    @apply text-lg font-semibold;
+  }
+  dd {
+    @apply font-extralight;
+  } */
+
+  
+} 
+
+
+
+@utility container-fluid {
+  margin-inline:  auto;
+  width: calc(100vw - 2rem);
+}
+
+@utility container-fluid-md {
+    margin-inline:  auto;
+    width: var(--breakpoint-md);
+    max-width: calc(100vw - 2rem);
+}
+
+@utility container-fluid-lg {
+    margin-inline:  auto;
+    width: var(--breakpoint-lg);
+    max-width: calc(100vw - 2rem);
+}
+
+  
+@utility container-fluid-xl {
+    margin-inline:  auto;
+    width: var(--breakpoint-xl);
+    max-width: calc(100vw - 2rem);
+}
+
+  
+@utility text-outline {
+    color: white;
+    text-shadow: -0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000;
+}
+@utility text-outline-1 {
+    color: white;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  }
+
+@utility outline1 {
+    color: black !important;
+    text-shadow: 1px 1px 0px white, 1px -1px 0px white, -1px 1px 0px white, -1px -1px 0px white;
+  }
+@utility outline4 {
+    color: white !important;
+    text-shadow: 1px 1px 0px black, 1px -1px 0px black, -1px 1px 0px black, -1px -1px 0px black;
+  }
+
+@utility tshadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+@utility text-shadow {
+    text-shadow: 2px 2px 4px black;
+  }
+@utility text-shadow-md {
+    text-shadow: 4px 4px 8px black;
+  }
+
+@utility tshadow-md {
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+@utility text-shadow-lg {
+    text-shadow: 10px 15px 30px rgba(0, 0, 0, 0.11), 0 5px 15px rgba(0, 0, 0, 0.08);
+  }
+
+@utility text-shadow-none {
+    text-shadow: none;
+  }
+
+@utility text-outline {
+    text-shadow: -0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000;
+
+    /* text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; */
+  }

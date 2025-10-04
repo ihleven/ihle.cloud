@@ -1,7 +1,6 @@
 package hi
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	gopath "path"
@@ -13,26 +12,6 @@ import (
 	"github.com/ihleven/pkg/errors"
 	"github.com/ihleven/pkg/hidrive"
 )
-
-func MetaHandler(prefix string, t hidrive.Token) web.HandlerFunc {
-
-	return func(w *web.ResponseWriter, r *http.Request) error {
-
-		meta, err := (&hdclient{"", t.AccessToken}).GetDir(r.URL.Path)
-		if err != nil {
-			if e, ok := (errors.Cause(err)).(*Error); ok {
-				fmt.Println(e.Code_, e.Message)
-				if e.Code_ == 403 && strings.HasSuffix(e.Message, "not a directory") {
-					meta, err = (&hdclient{"", t.AccessToken}).GetMeta(r.URL.Path)
-					return w.RespondJSON(meta)
-				}
-			}
-
-			return errors.Wrap(err, "Couldn't execute request")
-		}
-		return w.RespondJSON(meta)
-	}
-}
 
 func FileHandler(prefix string, t hidrive.Token) web.HandlerFunc {
 
@@ -59,31 +38,6 @@ func FileHandler(prefix string, t hidrive.Token) web.HandlerFunc {
 
 		_, err = io.Copy(w, resp.Body)
 
-		return err
-	}
-}
-
-func ThumbHandler(token string) web.HandlerFunc {
-
-	return func(w *web.ResponseWriter, r *http.Request) error {
-
-		req := newRequest(GET, "/file/thumbnail?"+r.URL.Query().Encode(),
-			bearer(token),
-		)
-
-		resp, err := req.Exec(&client)
-		if err != nil {
-			return errors.Wrap(err, "Couldn't execute request")
-		}
-
-		defer resp.Body.Close()
-
-		for key, val := range resp.Header {
-			w.Header().Set(key, val[0])
-		}
-		w.WriteHeader(resp.StatusCode)
-
-		_, err = io.Copy(w, resp.Body)
 		return err
 	}
 }

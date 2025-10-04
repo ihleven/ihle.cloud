@@ -1,0 +1,127 @@
+name: Build & Deploy ihleven☁️
+run-name: 🚀 Build & Deploy ihle.☁️ (${{ github.ref }},${{ github.event_name }},${{ github.actor }} )
+on:
+  push:
+    branches:
+      - develop
+      - feature/cms
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+        type: choice
+        options:
+        - info
+        - warning
+        - debug
+      tags:
+        description: 'Test scenario tags'
+        required: false
+        type: boolean
+      environment:
+        description: 'Environment to run tests against'
+        type: environment
+        required: true
+env:
+  FOO: 'bar' 
+jobs:
+  build-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+
+    - run: echo "🎉 The job was triggered by a ${{ github.event_name }} event., running on a ${{ runner.os }} server!"
+    - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+    - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+    - run: echo "🍏 This job's status is ${{ job.status }}."
+
+    - name: List files in the repository
+      run: |
+        ls ${{ github.workspace }}
+
+
+    - uses: actions/checkout@v4
+      name: Check out repository code
+
+    - name: Get the tag name
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - run: echo "🎉  tags =  ${{ steps.meta.outputs.tags }}, labels = ${{ steps.meta.outputs.labels }}"
+
+  
+    - name: List files in the repository
+      run: |
+        ls ${{ github.workspace }}
+
+    - uses: oven-sh/setup-bun@v2
+    - working-directory: ./ui
+      run: |
+        bun install
+        bun run generate
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Build
+      run: CGO_ENABLED=0  go build -v 
+
+    # - name: Test
+    #   run: go test -v ./...
+    - name: Deploy to Opalstack app tschabrun
+      uses: easingthemes/ssh-deploy@main
+      with:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        ARGS: "-rlgoDzvc -i"
+        SOURCE: "ihle.cloud ui/.output/public"
+        REMOTE_HOST: ${{ vars.OPALSTACK_HOST }}
+        REMOTE_USER: ${{ vars.OPALSTACK_USER }}
+        TARGET: ${{ vars.OPALSTACK_TARGET }}
+        # EXCLUDE: "/dist/, /node_modules/"
+        SCRIPT_BEFORE: |
+          echo "SCRIPT_BEFORE"
+          cat ${{ vars.OPALSTACK_TARGET }}/tschabrun.pid
+          ${{ vars.OPALSTACK_TARGET }}/stop
+          rm ${{ vars.OPALSTACK_TARGET }}/ihle.cloud
+          rm -r ${{ vars.OPALSTACK_TARGET }}/public
+          ls -la ${{ vars.OPALSTACK_TARGET }}
+          echo "SCRIPT_BEFORE DONE"
+        SCRIPT_AFTER: |
+          echo "SCRIPT_AFTER"
+          ${{ vars.OPALSTACK_TARGET }}/start
+          ls -la ${{ vars.OPALSTACK_TARGET }}
+          cat ${{ vars.OPALSTACK_TARGET }}/tschabrun.pid
+          echo "SCRIPT_AFTER DONE"
+# deployment:
+#   runs-on: ubuntu-latest
+#   steps:
+#     - uses: actions/checkout@v4
+#     - name: Use Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: '20.x'
+#     - run: npm ci
+#     - run: npm run build
+#     - name: Deploy to Opalstack app tschabrun
+#       uses: easingthemes/ssh-deploy@main
+#       with:
+#         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+#         ARGS: "-rlgoDzvc -i"
+#         SOURCE: ".output/"
+#         REMOTE_HOST: ${{ vars.OPALSTACK_HOST }}
+#         REMOTE_USER: ${{ vars.OPALSTACK_USER }}
+#         TARGET: ${{ vars.OPALSTACK_TARGET }}/output
+#         EXCLUDE: "/dist/, /node_modules/"
+#         SCRIPT_BEFORE: |
+#           whoami
+#           ls -al ${{ vars.OPALSTACK_TARGET }}
+#           ${{ vars.OPALSTACK_TARGET }}/stop
+#         SCRIPT_AFTER: |
+#           whoami
+#           ls -al
+#           echo $RSYNC_STDOUT
+#           ${{ vars.OPALSTACK_TARGET }}/start

@@ -1,4 +1,4 @@
-const defaultTheme = require('tailwindcss/defaultTheme')
+// const defaultTheme = require('tailwindcss/defaultTheme')
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -8,9 +8,14 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['iA Writer', ...defaultTheme.fontFamily.sans],
+        // sans: ['iA Writer', ...defaultTheme.fontFamily.sans],
         // sans: ['InterVariable', ...defaultTheme.fontFamily.sans],
-        raleway: ['RalewayVariable', ...defaultTheme.fontFamily.sans],
+        inter: ['InterVariable'],
+
+        writer: ['iA Writer'],
+        mono: ['iA Writer'],
+        raleway: ['RalewayVariable'],
+        // raleway: ['RalewayVariable', ...defaultTheme.fontFamily.sans],
         // mono: ['Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
       },
       colors: {

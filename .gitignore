@@ -5,6 +5,7 @@ node_modules
 .cache
 .output
 .env
+.data
 dist
 .DS_Store
 /cli/cld/public
@@ -12,3 +13,10 @@ dist
 *cld
 *cloud
 *cloud-linux-amd64
+/videos
+cli/accounts
+cli/hitokens
+id_rsa
+id_rsa.pub
+data
+pid
