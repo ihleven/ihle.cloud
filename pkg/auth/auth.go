@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ihleven/ihle.cloud/backend/hi"
+	"github.com/ihleven/ihle.cloud/pkg/hi"
 )
 
 func New(issuer, secretkey string, duration int, cookieName string, cookieSameSite http.SameSite, store hi.TokenStore, authstore authstore) {

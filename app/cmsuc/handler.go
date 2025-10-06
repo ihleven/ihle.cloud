@@ -15,7 +15,7 @@ import (
 	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
 	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
 	"github.com/gorilla/schema"
-	"github.com/ihleven/ihle.cloud/backend/auth"
+	"github.com/ihleven/ihle.cloud/pkg/auth"
 )
 
 func NewCMSApi(conf Config) (*Api, error) {

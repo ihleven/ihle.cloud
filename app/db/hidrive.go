@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ihleven/ihle.cloud/backend/hi"
+	"github.com/ihleven/ihle.cloud/pkg/hi"
 )
 
 type HiToken struct {

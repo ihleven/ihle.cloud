@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 
-	"github.com/ihleven/ihle.cloud/backend/auth"
+	"github.com/ihleven/ihle.cloud/pkg/auth"
 )
 
 func (db *DB) GetUser(id string) (*auth.Account, error) {

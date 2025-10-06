@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/ihleven/ihle.cloud/app/db"
-	"github.com/ihleven/ihle.cloud/backend/spa"
+	"github.com/ihleven/ihle.cloud/pkg/spa"
 	"github.com/moby/moby/pkg/pidfile"
 
 	"bitbucket.org/hotelplan/webcc-content/cms/content"
@@ -20,9 +20,9 @@ import (
 	"github.com/ihleven/ihle.cloud/app/art"
 	"github.com/ihleven/ihle.cloud/app/cmsuc"
 	"github.com/ihleven/ihle.cloud/app/familie"
-	"github.com/ihleven/ihle.cloud/backend/api"
-	"github.com/ihleven/ihle.cloud/backend/auth"
-	"github.com/ihleven/ihle.cloud/backend/hi"
+	"github.com/ihleven/ihle.cloud/pkg/api"
+	"github.com/ihleven/ihle.cloud/pkg/auth"
+	"github.com/ihleven/ihle.cloud/pkg/hi"
 
 	_ "github.com/joho/godotenv/autoload"
 )
