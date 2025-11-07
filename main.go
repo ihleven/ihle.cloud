@@ -9,7 +9,11 @@ import (
 	"path"
 	"syscall"
 
+	"github.com/ihleven/ihle.cloud/app/art/importart"
 	"github.com/ihleven/ihle.cloud/app/db"
+	"github.com/ihleven/ihle.cloud/app/super8"
+	"github.com/ihleven/ihle.cloud/pkg/cmd"
+	"github.com/ihleven/ihle.cloud/pkg/mail"
 	"github.com/ihleven/ihle.cloud/pkg/spa"
 	"github.com/moby/moby/pkg/pidfile"
 
@@ -27,26 +31,92 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-type Flags struct {
-	Port                int    `arg:"-p,--port,      env"                  default:"8000"  help:"Port number"`
-	HidriveClientID     string `arg:"                env:CLIENT_ID"`
-	HidriveClientSecret string `arg:"                env:CLIENT_SECRET"`
-	RepoContent         string `arg:"                env:REPO_CONTENT" `
-	DataDir             string `arg:"--data-dir,     env:DATA_DIR"         default:"data"`
-	SearchLevel         string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended"`
-	SearchDir           string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, leave empty for in mem index"`
+// ih-app
+// ihlvn-api / ihlvn-app / ihlvn-cloud
 
-	JWTIssuer      string        `arg:"env:JWT_ISSUER"                              default:"ihle.cloud"`
-	JWTSecretKey   string        `arg:"env:JWT_SECRET_KEY" `
-	JWTDuration    int           `arg:"env:JWT_DURATION"                            default:"3600" help:"Duration of JWT token in seconds"`
-	CookieName     string        `arg:"env:COOKIE_NAME"                        default:"jwt" help:"Name for auth cookie"`
-	CookieSameSite http.SameSite `arg:"env:COOKIE_SAME_SITE"                        default:"2" help:"SameSite attribute of auth cookie: Default (1) Lax (2), Strict (3), None (4)"`
-	DbConn         string        `arg:"env:DB_CONN"                                 default:"postgres://localhost:5432/authdb"`
-	Pidfile        string        `arg:"--pid-file,   env:PIDFILE"    `
-	SPAPath        string        `arg:"--spa-path,   env:SPA_PATH"    default:"ui/.output/public"`
+var (
+	BUILD_DIR       string
+	BUILD_TIME      string
+	BUILD_OUTPUT    string
+	GIT_DESCRIPTION string
+)
+
+type Flags struct {
+	Port                int    `arg:"-p,--port,               env"                  default:"8000"  help:"Port number"`
+	HidriveClientID     string `arg:"--hidrive-client-id,     env:CLIENT_ID"        placeholder:"ID"`
+	HidriveClientSecret string `arg:"--hidrive-client-secret, env:CLIENT_SECRET"    placeholder:"SECRET"`
+	RepoContent         string `arg:"                         env:REPO_CONTENT"     placeholder:"URL" `
+	DataDir             string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
+	SearchLevel         string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
+	SearchDir           string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, leave empty for in mem index" placeholder:"DIR"`
+
+	JWTIssuer      string        `arg:"--jwt-issuer,env:JWT_ISSUER"                         default:"ihle.cloud" placeholder:"ISSUER"`
+	JWTSecretKey   string        `arg:"--jwt-secret,env:JWT_SECRET_KEY"                                          placeholder:"KEY"`
+	JWTDuration    int           `arg:"--jwt-duration,env:JWT_DURATION"        default:"36000" help:"Duration of JWT token in seconds"`
+	CookieName     string        `arg:"env:COOKIE_NAME"                        default:"jwt"  help:"Name for auth cookie"`
+	CookieSameSite http.SameSite `arg:"env:COOKIE_SAME_SITE"                   default:"2"    help:"SameSite attribute of auth cookie: Default (1) Lax (2), Strict (3), None (4)"`
+	DbConn         string        `arg:"env:DB_CONN"                            default:"postgres://localhost:5432/authdb" placeholder:"CONN"`
+	Pidfile        string        `arg:"--pid-file,   env:PIDFILE"              default:"" placeholder:"FILENAME"`
+	SPAPath        string        `arg:"--spa-path,   env:SPA_PATH"             default:"ui/.output/public" placeholder:"DIR" help:"path to nuxt spa"`
+	// 	Debug        bool   `arg:"-d,--debug,env"      default:"false"          help:"Enable debug mode"`
+	// 	Pretty       bool   `arg:"--pretty,env:LOG_PRETTY"                      help:"Enable pretty logging"`
+	// 	Verbose      bool   `arg:"-v,--verbose,env"                             help:"Enable verbose mode"`
+
 }
 
-func (f Flags) cmsConfig() cmsuc.Config {
+func (RootCmd) Version() string {
+	return cmd.Info.Version.String()
+}
+
+type RootCmd struct {
+	// *ServerCmd `arg:"subcommand:server"`
+	*importart.ImportCmd `arg:"subcommand:import"`
+	*mail.MailCmd        `arg:"subcommand:mail"`
+
+	// root cmd flags
+	Port  int  `arg:"-p,--port,env:PORT" default:"8000"   help:"Port numbe"` // default:"10815"
+	Clone bool `arg:"--clone"`
+}
+
+func main() {
+
+	// set cmd.Info
+	cmd.SetLdflags(BUILD_DIR, BUILD_TIME, BUILD_OUTPUT, GIT_DESCRIPTION)
+
+	content.Register(super8.Super8{})
+	// yaml.RegisterCustomUnmarshaler[content.Entry](content.UnmarshalYAMLEntry)
+	content.Register(familie.Person{})
+	content.Register(familie.Reise{})
+	search.RegisterMappingAdapter(familie.AdaptMapping)
+	search.RegisterMappingAdapter(familie.AdaptMappingReise)
+	content.Register(art.Ausstellung{})
+	content.Register(art.Work{})
+	// content.Register(ctype.Page{})
+
+	var err error
+	var root RootCmd
+	var flags Flags
+
+	p := arg.MustParse(&root, &flags)
+
+	handle_pidfile(flags.Pidfile)
+
+	switch subcmd := p.Subcommand().(type) {
+	case *importart.ImportCmd:
+		err = subcmd.Run()
+	case *mail.MailCmd:
+		err = subcmd.Run()
+	default:
+		err = root.RunServer(flags)
+	}
+
+	if err != nil {
+		fmt.Println("FEHLER: ", err)
+		os.Exit(1)
+	}
+}
+
+func (flags Flags) cmsConfig() cmsuc.Config {
 	conf := cmsuc.Config{
 		RepoContent: flags.RepoContent,
 		DataDir:     flags.DataDir,
@@ -55,62 +125,15 @@ func (f Flags) cmsConfig() cmsuc.Config {
 	return conf
 }
 
-// ihle-api
-// cloud-ihleven
-// ihleven-api
-// ihleven.de/hi/media
-// api.ihle.cloud/api
+func (cmd *RootCmd) RunServer(flags Flags) error {
 
-var flags Flags
-
-// var tokenmap map[string]hi.Token = map[string]hi.Token{}
-var route = api.WithRoute
-
-func handle_pidfile(p string) {
-	if p == "" {
-		return
-	}
-	err := pidfile.Write(flags.Pidfile, os.Getpid())
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(99)
-	}
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func(f string) {
-		sig := <-c
-		fmt.Println("\nsignal:", sig)
-		err := os.Remove(f)
-		if err != nil {
-			fmt.Println(err)
-		}
-		os.Exit(0)
-	}(flags.Pidfile)
-}
-
-func main() {
-	arg.MustParse(&flags)
-
-	handle_pidfile(flags.Pidfile)
-
-	db, err := db.New(flags.DbConn)
+	pg, err := db.New(flags.DbConn)
 	if err != nil {
 		log.Fatal("db.New:", err)
 	}
-	defer db.Close()
+	defer pg.Close()
 
-	content.Register(familie.Person{})
-	content.Register(familie.Reise{})
-	content.Register(art.Ausstellung{})
-	content.Register(art.Work{})
-
-	// conf := cms.Config{
-	// 	RepoContent: flags.RepoContent,
-	// 	DataDir:     flags.DataDir,
-	// 	Search:      search.Config{Level: search.ParseLevel(flags.SearchLevel), DataDirPath: flags.DataDir, IndexName: flags.SearchDir},
-	// }
-
-	auth.New(flags.JWTIssuer, flags.JWTSecretKey, flags.JWTDuration, flags.CookieName, flags.CookieSameSite, db, db)
+	auth.New(flags.JWTIssuer, flags.JWTSecretKey, flags.JWTDuration, flags.CookieName, flags.CookieSameSite, pg, pg)
 
 	cmsapi, err := cmsuc.NewCMSApi(flags.cmsConfig())
 	if err != nil {
@@ -119,19 +142,25 @@ func main() {
 
 	fapi := familie.NewApi(cmsapi.Repo, cmsapi.Engine)
 
+	var route = api.WithRoute
+
 	srvr := api.New(
 
 		api.Handler("/", spa.Serve(flags.SPAPath)),
 
 		// route(" POST /tokenauth                ", tokenauth), // soll token liefern für spezielle Funktionalität
-		route("      /apihle/auth/authorize    ", authorize),
-		route("      /hi/auth/authcode         ", callback(db)),
+		route("      /apihle/auth/authorize    ", flags.authorize),
+		route("      /hi/auth/authcode         ", flags.callback(pg)),
 
 		route("      /auth/signin        ", auth.Signin),
 		route("      /auth/login         ", auth.Login),
 		route("      /auth/token         ", auth.TokenAuthHandler),
 		route("      /auth/logout        ", auth.Logout),
 		route("      /auth/session       ", auth.Session),
+
+		route("      /api/auth/login         ", auth.Login),
+		route("      /api/auth/logout        ", auth.Logout),
+		route("      /api/auth/session       ", auth.Session),
 
 		route("  GET /hi/meta/{path...}        ", hi.MetaHandlerMux),
 		route("  GET /hi/media/{path...}       ", hi.FileHandlerMux),
@@ -143,22 +172,26 @@ func main() {
 		route("  GET /api/v1/entries/{path...} ", cmsapi.EntryDetails),
 		route("  PUT /api/v1/entries/{path...} ", cmsapi.EntryUpdate),
 
-		route("GET  /api/v1/personen/{person}", fapi.PersonHandler),
-		route("GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
-		route("GET  /api/v1/search", cmsuc.SearchEntries(cmsapi.CMS)),
+		route("  GET /api/v1/entry             ", cmsuc.EntryLookup(cmsapi.CMS)), // lookup single entry with search params
+		// route("  GET /api/v1/entries           ", cmsuc.EntriesLookup(cmsapi.CMS)), // lookup entries with search params
+
+		route("  GET  /api/v1/super8/{path...}", super8.ServeHiVideo),
+		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
+		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
+		route("  GET  /api/v1/search", cmsuc.SearchEntries(cmsapi.CMS)),
 	)
 
-	srvr.ListenAndServe(flags.Port)
+	return srvr.ListenAndServe(cmd.Port, nil)
 }
 
-func authorize(w http.ResponseWriter, r *http.Request) error {
+func (flags Flags) authorize(w http.ResponseWriter, r *http.Request) error {
 
 	url := fmt.Sprintf("https://my.hidrive.com/client/authorize?client_id=%s=&response_type=code&scope=admin,rw&state=%s&redirect_uri=http://localhost:8000/hi/auth/authcode", flags.HidriveClientID, r.URL.Query().Get("state"))
 	http.Redirect(w, r, url, http.StatusSeeOther)
 	return nil
 }
 
-func callback(db *db.DB) func(w http.ResponseWriter, r *http.Request) error {
+func (flags Flags) callback(db *db.DB) func(w http.ResponseWriter, r *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 
 		code := r.URL.Query().Get("code")
@@ -182,8 +215,8 @@ func callback(db *db.DB) func(w http.ResponseWriter, r *http.Request) error {
 			Path:     "/",
 			MaxAge:   token.ExpiresIn,
 			HttpOnly: true,
-			// Secure:   true,
-			// SameSite: http.SameSiteLaxMode,
+			Secure:   true,
+			SameSite: http.SameSiteNoneMode,
 		})
 
 		http.Redirect(w, r, r.URL.Query().Get("state"), http.StatusSeeOther)
@@ -273,3 +306,64 @@ func testNewHiFS(accesstoken string) {
 	fmt.Printf("%d: %s %s", n, bytes, err)
 
 }
+
+func handle_pidfile(filename string) {
+	if filename == "" {
+		return
+	}
+	err := pidfile.Write(filename, os.Getpid())
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(99)
+	}
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func(f string) {
+		sig := <-c
+		fmt.Println("\nsignal:", sig)
+		err := os.Remove(f)
+		if err != nil {
+			fmt.Println(err)
+		}
+		os.Exit(0)
+	}(filename)
+}
+
+// package cli // main
+
+// import (
+// 	"bitbucket.org/hotelplan/webcc-pkg/web"
+// 	"github.com/ihleven/ihle.cloud/hi"
+// 	"github.com/ihleven/pkg/hidrive"
+// )
+
+// // github.com/ihleven/pkg/hidrive
+// var drive *hidrive.Drive
+
+// func (cmd *Command) run() {
+
+// 	manager := hidrive.NewAuthManager(CLIENT_ID, CLIENT_SECRET)
+// 	drive = hidrive.NewDrive(manager)
+
+// 	// srv := web.NewServer(false, web.Addr("", cmd.Port))
+// 	// srv.Register("/", serveSPA(cmd.FrontendPath)) // serve prerendred nuxt app
+// 	// srv.Register("/hidrive", handler)                    //
+// 	// srv.Register("/serve", serve)                        //
+// 	// srv.Register("/wolfgang-ihle", serveWolfgangIhle())  // used for catalogs on wolfgang-ihle.de
+// 	// srv.Register("/media/videos", servePrefix("videos")) // used for serving local video on opalstack
+// 	// srv.Register("/proxy", serveReverseProxy())          // goldene hochzeit
+// 	// srv.Register("/thumbs", thumbs) //
+
+// 	// neu
+// 	t, _ := manager.GetAccessToken("wolfgang")
+// 	hfs := hi.New(t.AccessToken)
+// 	// srv.Register("/api/meta", hi.MetaHandler("", *t))
+// 	srv.Register("/api/raw", hi.FileHandler("", *t)) // neu: hi.FileHandler
+// 	// srv.Register("/api/thumbs", hi.ThumbHandler(t.AccessToken))
+// 	// srv.Register("/api/hidrive", FileServer(hfs))
+// 	// srv.Register("/hidrive-new", FileServer(hfs))
+// 	// srv.Register("/api/home", FileServer((dirFS)("/Users/ih"))) // lokales filesystem
+// 	srv.Register("/api/tag", hi.TagsHandler(t.AccessToken, hfs))
+
+// 	srv.Run()
+// }

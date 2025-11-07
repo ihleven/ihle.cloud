@@ -87,7 +87,7 @@ func (s *TokenMngr) GetTokenRefresher(key string) *TokenRefresher {
 // }
 
 const (
-	lifeSpanSafetyMargin = 59 * time.Minute // 10 * time.Millisecond
+	lifeSpanSafetyMargin = 1 * time.Minute // 10 * time.Millisecond
 	retryDelay           = 100 * time.Millisecond
 )
 
@@ -109,7 +109,7 @@ func (s *TokenMngr) newTokenRefresher(token Token, expiresAt time.Time) *TokenRe
 			expiration = time.Until(expiresAt)
 			// fmt.Println("expiration time.Until(expiresAt):", expiresAt)
 		}
-		fmt.Println("expiration:", expiration)
+		// fmt.Println("expiration:", expiration)
 		expired := time.After(expiration - lifeSpanSafetyMargin)
 		// time.NewTimer
 
@@ -119,7 +119,7 @@ func (s *TokenMngr) newTokenRefresher(token Token, expiresAt time.Time) *TokenRe
 			select {
 			case a.stream <- tokenResponse{token: a.token, Err: err}:
 
-			case v := <-expired:
+			case _ = <-expired:
 
 				// log.Printf("Token for %s expired at %s", a.token.Alias, v)
 				t, e := s.RefreshToken(a.token.RefreshToken)
@@ -131,7 +131,8 @@ func (s *TokenMngr) newTokenRefresher(token Token, expiresAt time.Time) *TokenRe
 					expiration = time.Duration(t.ExpiresIn) * time.Second
 					a.token = *t
 					// s.StoreToken(t)
-					log.Printf("Token for %s refreshed at %s %v", a.token.Alias, expiration, v)
+					// fmt.Println()
+					// log.Printf("Token for %s refreshed", a.token.Alias)
 				}
 				expired = time.After(expiration - lifeSpanSafetyMargin)
 				// fmt.Println("expiration", expiration, "expired", expired, "token:", t.ExpiresIn)
@@ -162,7 +163,7 @@ func (a *TokenRefresher) GetAccessToken() (string, error) {
 	tokenresponse := <-a.stream
 	// 	return t.token.AccessToken, t.Err
 	// workaround
-	fmt.Println("GetAccessToken", tokenresponse.token.Alias, tokenresponse.token.AccessToken)
+	// fmt.Println("GetAccessToken", tokenresponse.token.Alias, tokenresponse.token.AccessToken)
 	return tokenresponse.token.AccessToken, tokenresponse.Err
 }
 

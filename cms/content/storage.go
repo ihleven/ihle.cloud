@@ -8,6 +8,7 @@ import (
 
 	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
 	"github.com/adrg/frontmatter"
+	"github.com/goccy/go-yaml"
 )
 
 // SerializeForStorage is used before saving an entry to the storage.
@@ -17,7 +18,7 @@ import (
 func (e *Entry) SerializeForStorage() ([]byte, error) {
 
 	if e == nil {
-		return nil, errors.New("entry is nil")
+		return nil, errors.New("nil entry")
 	}
 
 	ct := e.ContentType()
@@ -29,11 +30,28 @@ func (e *Entry) SerializeForStorage() ([]byte, error) {
 		e.Meta.Tags = []string{}
 	}
 
-	if ct.MIME == "text/markdown" {
-		return e.MarshalToMarkdown() // SerializeMD(e)
+	switch ct.MIME {
+	case "application/json":
+		bytes, err := json.MarshalIndent(e, "", "    ")
+		if err != nil {
+			return nil, errors.Wrap(err, "json marshal error")
+		}
+		return bytes, err
+	case "application/yaml":
+		bytes, err := yaml.Marshal(e)
+		if err != nil {
+			return nil, errors.Wrap(err, "yaml marshal error")
+		}
+		return bytes, err
+	case "text/markdown":
+		bytes, err := e.MarshalToMarkdown() // SerializeMD(e)
+		if err != nil {
+			return nil, errors.Wrap(err, "markdown marshal error")
+		}
+		return bytes, err
 	}
-	bytes, err := json.MarshalIndent(e, "", "    ")
-	return bytes, err
+
+	return nil, errors.New("unknown mimetype %s", ct.MIME)
 }
 
 func (e *Entry) MarshalToMarkdown() (text []byte, err error) {
@@ -96,6 +114,11 @@ func ParseEntry(entry *Entry, bytes []byte, contentType string) (*Entry, error) 
 		err := ParseMarkdownEntryFromStorage(bytes, entry)
 		if err != nil {
 			return nil, errors.Wrap(err, "Couldn't parse markdown content")
+		}
+	} else if strings.Contains(contentType, "application/yaml") {
+		err := yaml.Unmarshal(bytes, entry)
+		if err != nil {
+			return nil, errors.Wrap(err, "Couldn't parse content with contentType %s -> %s", contentType, bytes)
 		}
 	} else {
 		// JSON as default

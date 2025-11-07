@@ -1,8 +1,8 @@
 export default defineAppConfig({
 
-  api: {
-    baseURL: 'http://localhost:8000',
-  },
+  // api: {
+  //   baseURL: 'http://localhost:8000',
+  // },
 
   toaster: {
     duration: 5000,

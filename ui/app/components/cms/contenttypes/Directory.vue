@@ -91,16 +91,20 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
-  entry: Entry
-}>()
+import { useStorage } from '@vueuse/core'
+
+defineProps<{ entry: Entry }>()
 const cat = '' // localStorage.getItem('mode')
 
-const mode = ref<'cols' | 'list'>(cat || 'cols')
+const mode = useStorage<'cols' | 'list'>('ihleven-dir-mode', cat || 'cols')
+
+// const mode = ref<'cols' | 'list'>(cat || 'cols')
+
 function setMode(m: 'cols' | 'list') {
   mode.value = m
   localStorage.setItem('mode', m)
 }
+
 const active = ref<Entry | null>(null)
 
 const folderItems = computed(() => {
@@ -108,7 +112,7 @@ const folderItems = computed(() => {
   if (!active.value) return []
   const basename = active.value?.path.replace(/.*\//, '') || ''
   const path = basename.indexOf('.') > -1 ? dirname(active.value.path) : active.value.path
-  const slugs = path.split('/').filter(slug => !!slug)
+  const slugs = path?.split('/').filter(slug => !!slug)
   return slugs.map((p, i) => ({
     label: p,
     icon: 'i-lucide-folder',

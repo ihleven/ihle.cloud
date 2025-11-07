@@ -1,6 +1,6 @@
 <template>
-  <article class="min-h-full grow bg-amber-400 pb-16">
-    <header><NuxtLink :to="`/entries/${entry?.path}`">{{ entry?.id }}</NuxtLink></header>
+  <article class="h-full min-h-full w-full">
+    <!-- <header><NuxtLink :to="`/entries/${entry?.path}`">{{ entry?.id }}</NuxtLink></header> -->
     <component
       :is="component"
       v-model:entry="entry"
@@ -19,7 +19,7 @@ definePageMeta({
       const { session } = useAuth()
       if (!session.value?.aud.includes('famihli')) {
         console.log('access not allowed', session.value)
-        return navigateTo('/login?redirect=' + encodeURIComponent(to.fullPath) + '&reason=noperm&aud=famihlie')
+        // return navigateTo('/login?redirect=' + encodeURIComponent(to.fullPath) + '&reason=noperm&aud=famihlie')
       }
     },
   ],
@@ -31,22 +31,24 @@ const full_slug = slugs ? typeof slugs === 'string' ? slugs : slugs.join('/') : 
 
 // const breadcrumb = ref<{ label: string }[] | null>([{ label: 'home' }, ...full_slug.split('/').map(slug => ({ label: slug }))])
 
-const { data: entry } = await useFetch<Entry>(`/api/v1/entries`, {
+const { data: entry, error } = await useFetch<Entry>(`/api/v1/entry`, {
   baseURL: useRuntimeConfig().public.api.base,
   credentials: 'include',
   query: {
-    fields: '*',
     slugs: full_slug,
   },
 })
 
-// setPageLayout(entry.value.space === 'familie' ? 'familie' : 'default')
+if (error.value) {
+  throw createError({ statusCode: 404, message: 'not find' })
+}
 
 const componentmap: Record<string, object | string> = {
+  Super8: resolveComponent('PageSuper8'),
   Ausstellung: resolveComponent('PageExhibition'),
   Person: resolveComponent('PagePerson'),
   Default: resolveComponent('PageExhibition'),
 }
 
-const component = computed(() => componentmap[(entry.value as Entry).type] || componentmap.Default)
+const component = computed(() => entry.value ? componentmap[(entry.value as Entry).type] : componentmap.Default)
 </script>

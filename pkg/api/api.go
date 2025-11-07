@@ -73,10 +73,14 @@ func Handler(pattern string, h http.Handler) func(*Api) {
 	}
 }
 
-func (a *Api) ListenAndServe(port int) error {
+func (a *Api) ListenAndServe(port int, origins []string) error {
+
+	if len(origins) == 0 {
+		origins = []string{"http://localhost:3000"}
+	}
 
 	corsMw, err := jubcors.NewMiddleware(jubcors.Config{
-		Origins:        []string{"http://localhost:3000"},
+		Origins:        origins,
 		Methods:        []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
 		RequestHeaders: []string{"Authorization", "Content-Type"},
 		Credentialed:   true,

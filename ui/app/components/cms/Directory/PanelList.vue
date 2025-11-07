@@ -3,7 +3,7 @@
     <li
       v-for="(f, i) in files"
       :key="f.path"
-      class="col-span-4 grid grid-cols-subgrid rounded even:bg-gray-200"
+      class="col-span-5 grid grid-cols-subgrid rounded even:bg-gray-200"
       :class="{ 'bg-sky-300 text-gray-100 even:bg-sky-300': active === i }"
       @click="activate(f.entry, i)"
       @dblclick="goto(i)"
@@ -29,9 +29,12 @@
         </div>
       </main>
 
-      <aside class="">{{ f.level }}</aside>
+      <aside class="">{{ f.entry.owner }}</aside>
+      <aside class="">{{ f.entry.type }}</aside>
+      <aside class="">{{ f.entry.name }}<br>{{ f.entry.notes }}<br>{{ f.entry.tags }}</aside>
+      <aside class="">{{ f.entry.slug }}<br>{{ f.entry.full_slug }}<br>{{ f.entry.status }}</aside>
 
-      <aside>{{ f.children }} - {{ f.parent?.children }}</aside>
+      <!-- <aside>{{ f.children }} - {{ f.parent?.children }}</aside> -->
 
     </li>
 
@@ -40,7 +43,7 @@
 
 <script lang="ts" setup>
 const props = defineProps<{
-  entry: Entry & { content: Entry[] }
+  entry: Entry & { content: DirEntry[] }
 }>()
 
 const emit = defineEmits<{
@@ -63,7 +66,7 @@ function entry2file(e: Entry, parent?: File): File {
   return {
     name: e.name,
     path: e.path,
-    slugs: e.path.split('/'),
+    slugs: e.full_slug ?? e.path.split('/'),
     type: e.type === 'Dir' ? 'Dir' : 'File',
     opened: false,
     parent: parent,
@@ -105,9 +108,10 @@ async function open(index: number) {
   }
 
   const data = await $fetch<Entry & { content: Entry[] }>(`/api/v1/entries/${e.path}`, {
-    baseURL: useRuntimeConfig().public.apiBaseURL,
+    baseURL: useRuntimeConfig().public.api.base as string,
     credentials: 'include',
   })
+
   const newfiles = [...data.content].sort(foldersBeforeFiles).map(f => entry2file(f, e))
 
   files.value.splice(index + 1, 0, ...newfiles)

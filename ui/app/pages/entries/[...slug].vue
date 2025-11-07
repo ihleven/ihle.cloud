@@ -1,7 +1,7 @@
 <template>
   <article
 
-    class="grow bg-green-100"
+    class="flex grow flex-col items-stretch bg-green-100"
   >
     <header
 
@@ -72,32 +72,15 @@
       @patch:entry="patchEntry"
     />
 
-    <section v-if="error">
+    <!-- <section v-if="error">
       error: {{ error.statusCode }}: {{ error.statusMessage }}
-    </section>
-    <section
-      v-else
-      class="z-0 flex grow items-stretch justify-between"
-    >
-      <!-- <aside>ASIDE</aside>
-      <USeparator
-        orientation="vertical"
-        class="h-48"
-      /> -->
-      <component
-        :is="component"
-        v-model:entry="entry"
-        class="z-0 grow"
-        @patch:entry="patchEntry"
-      />
+    </section> -->
 
-      <aside
-        v-show="show?.slideright"
-        class="border-l border-gray-300 p-4"
-      >
-        <USkeleton class="h-full" />
-      </aside>
-    </section>
+    <component
+      :is="component"
+      v-model:entry="entry"
+      @patch:entry="patchEntry"
+    />
 
     <EntrySource
       :open="show.source"
@@ -140,26 +123,17 @@ const entry = ref<Entry>(data.value as Entry)
 const componentmap: Record<string, object | string> = {
   Person: resolveComponent('Person'),
   Work: resolveComponent('Artwork'),
-  // MDPage: resolveComponent('MDPage'),
-  // Article: resolveComponent('Article'),
-  // Category: resolveComponent('Category'),
-  // ContentAsset: resolveComponent('ContentAsset'),
-  // Destination: resolveComponent('Destination'),
-  // SeoPage: resolveComponent('SeoPage'),
-  // Account: resolveComponent('Account'),
-  // // Error: resolveComponent('Error'),
-  // Folder: resolveComponent('Folder'),
+  Super8: resolveComponent('Super8'),
   Dir: resolveComponent('Directory'),
   Default: resolveComponent('Entry'),
 }
 
-const component = computed(() => componentmap[(entry.value as Entry).type] || componentmap.Default)
-
+const component = computed(() => entry.value ? componentmap[(entry.value as Entry).type] : componentmap.Default)
+console.log('component', component.value)
 function patchEntry(key: string, value: string | number | object | boolean | null | string[]) {
   if (entry.value) {
     set(entry.value, key, value)
   }
-  // console.log(' * entry patch:', key, '=>', value, entry.value[key])
 }
 
 function reset() {
@@ -175,7 +149,7 @@ async function save() {
   try {
     state.value = 'saving'
     const data = await $fetch<Entry>(path, {
-      baseURL: api.base as string,
+      baseURL: api.base as string + `/api/v1/`,
       credentials: 'include',
       method: 'PUT',
       body: entry.value,

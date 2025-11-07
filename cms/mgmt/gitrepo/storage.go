@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/goccy/go-yaml"
 )
 
 // GetEntryByPath liefert den entry, der `path` zugeordnet ist.
@@ -33,12 +34,21 @@ func (r *Sitory) GetEntry(path string) (*content.Entry, error) {
 		if err != nil {
 			return nil, errors.WrapWithCode(err, 500, "cannot unmarshal entry")
 		}
+	} else if strings.HasSuffix(path, ".yaml") {
+		err = yaml.Unmarshal(bytes, &entry)
+		if err != nil {
+			return nil, errors.WrapWithCode(err, 500, "cannot unmarshal entry")
+		}
 	} else {
 
 		err = json.Unmarshal(bytes, &entry)
 		if err != nil {
 			return nil, errors.WrapWithCode(err, 500, "cannot unmarshal entry")
 		}
+	}
+
+	if entry.Path != path {
+		return nil, errors.New(" entry path (%s) and storage path (%s) differ", entry.Path, path)
 	}
 
 	return &entry, nil

@@ -1,5 +1,6 @@
 <template>
   <article class="bg-gray-100">
+    ENTRY
     <ClientOnly>
       <!-- <section class="relative">
       <h1 class=" top-2 left-2 rounded border border-white p-2 mx-auto bg-white/70 text-gray-700 text-xl">

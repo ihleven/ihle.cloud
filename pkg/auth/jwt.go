@@ -31,9 +31,9 @@ func (c JWT) newClaims(account *Account, audience ...string) Claims {
 			ID:        "",
 		},
 		Permissions: map[string]struct{}{},
-		ID:          account.ID,
-		Name:        "account.Credentials.Username",
-		Email:       "account.Email",
+		// ID:          account.ID,
+		// Name:        "account.Credentials.Username",
+		// Email:       "account.Email",
 	}
 	for _, k := range audience {
 		claims.Permissions[k] = struct{}{}
@@ -44,9 +44,9 @@ func (c JWT) newClaims(account *Account, audience ...string) Claims {
 type Claims struct {
 	jwt.RegisteredClaims
 
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	// ID    string `json:"id"`
+	// Name  string `json:"name"`
+	// Email string `json:"email"`
 
 	Permissions map[string]struct{} `json:"permissions"`
 }

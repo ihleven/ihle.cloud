@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -78,7 +77,8 @@ func New(configurl string, dataDir string, clone bool, options ...func(*Sitory) 
 		}
 		err = repo.Clone(repopath)
 	} else {
-		err = repo.Open(repopath)
+		err = repo.Open(repopath, false)
+		fmt.Println("repo.Open done", repo.gitRepo)
 	}
 
 	if err != nil {
@@ -158,9 +158,10 @@ func WithCommitter(name, email string) func(*Sitory) error {
 		return nil
 	}
 }
-func (r *Sitory) Open(repopath string) error {
-	// repopath = "file://Users/ih/src/webcc-content/cms/data/repo_content"
-	fmt.Println("open", repopath)
+
+// Open will open local repopath, e.g. "file://Users/ih/src/webcc-content/cms/data/repo_content"
+func (r *Sitory) Open(repopath string, verbose bool) error {
+
 	repo, err := git.PlainOpen(repopath)
 	if err != nil {
 		if errors.Is(err, git.ErrRepositoryNotExists) {
@@ -168,10 +169,15 @@ func (r *Sitory) Open(repopath string) error {
 		}
 		return err
 	}
+
 	r.gitRepo = repo
-	wt, _ := repo.Worktree()
-	remotes, _ := repo.Remotes()
-	fmt.Println("opened repo:", repo.Storer, wt, remotes)
+
+	if verbose {
+		fmt.Println("open", repopath)
+		wt, _ := repo.Worktree()
+		remotes, _ := repo.Remotes()
+		fmt.Println("opened repo:", repo.Storer, wt, remotes)
+	}
 
 	return nil
 }
@@ -249,21 +255,27 @@ func (r *Sitory) Status() (git.Status, error) {
 	return status, nil
 }
 
-func (repo *Sitory) ListEntries(skiperrors bool) ([]content.Entry, error) {
+func (repo *Sitory) ListEntries(breakonerror bool) ([]content.Entry, error) {
 	repo.RWMutex.RLock()
 	defer repo.RWMutex.RUnlock()
 
 	entries := make([]content.Entry, 0)
 
-	for path, dir := range repo.Directories {
+	for pth, dir := range repo.Directories {
 		for _, filename := range dir.Entries {
-			e, err := repo.GetEntry(filepath.Join(path, filename))
-			if err != nil && !skiperrors {
-				return nil, errors.Wrap(err, "cannot get entry for path %s", filepath.Join(path, filename))
+
+			fpath := path.Join(pth, filename)
+
+			e, err := repo.GetEntry(fpath)
+			if err != nil && breakonerror {
+				return nil, errors.Wrap(err, "cannot get entry %s", fpath)
 			}
+
 			if err == nil {
 				entries = append(entries, *e)
 			}
+
+			// entries = append(entries, *e)
 		}
 	}
 

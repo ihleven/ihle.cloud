@@ -47,7 +47,7 @@ func New(issuer, secretkey string, duration int, cookieName string, cookieSameSi
 	// 	AuthenticatorPKG.m[k] = newTokenRefresher(context.Background(), *v, time.Now())
 	// }
 
-	fmt.Println("init:", AuthenticatorPKG.accounts)
+	// fmt.Println("init:", AuthenticatorPKG.accounts)
 	// fmt.Println("init:", AuthenticatorPKG.m)
 }
 
@@ -99,16 +99,16 @@ func (a *Authenticator) GetToken(account *Account) (string, error) {
 	return "", errors.New("token for " + account.ID + " not found")
 }
 
-func GetAccountUnused(r *http.Request) (*Account, error) {
+func GetAccountUnused(r *http.Request) (*Account, *Claims, error) {
 
 	cookie, err := r.Cookie("jwt")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	claims, err := AuthenticatorPKG.ParseClaims(cookie.Value)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	AuthenticatorPKG.RLock()
@@ -116,10 +116,10 @@ func GetAccountUnused(r *http.Request) (*Account, error) {
 
 	account, ok := AuthenticatorPKG.accounts[claims.Subject]
 	if !ok {
-		return nil, errors.New("account %s not found: " + account.ID)
+		return nil, nil, errors.New("account %s not found: " + account.ID)
 	}
 	fmt.Printf("GetAccount: %s\n", account.ID)
-	return account, nil
+	return account, claims, nil
 }
 
 // func (a *Authenticator) add(authdata hiauth.Token, account string) error {

@@ -3,7 +3,9 @@ package auth
 import "golang.org/x/crypto/bcrypt"
 
 type Account struct {
-	ID string `json:"id"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 	Credentials
 	Settings `json:"settings"`
 }
@@ -20,6 +22,11 @@ type Settings struct {
 		Home  string `json:"home"`
 		Root  string `json:"root"`
 	} `json:"hidrive"`
+
+	CMS struct {
+		Groups      []string `json:"groups"`
+		Permissions []string `json:"permissions"`
+	} `json:"cms"`
 }
 
 // HashPassword takes a password and returns the bcrypt hash in a string format.

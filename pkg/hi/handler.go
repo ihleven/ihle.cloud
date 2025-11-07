@@ -211,7 +211,6 @@ func ThumbHandler_Dep(w http.ResponseWriter, req bunrouter.Request) error {
 
 func ThumbHandlerMux(w http.ResponseWriter, r *http.Request) error {
 
-	// prefix, accesstoken, _ := auth.GetPrefixAndToken(req.Request)
 	accesstoken := hicookie(r)
 	prefix := ""
 
@@ -242,53 +241,23 @@ func ThumbHandlerMux(w http.ResponseWriter, r *http.Request) error {
 
 }
 
-func ServeReverseProxy_Dep(w http.ResponseWriter, req bunrouter.Request) error {
-	fmt.Println("ServeReverseProxy")
-	// prefix, accesstoken, _ := auth.GetPrefixAndToken(req.Request)
-	accesstoken := req.Context().Value(AuthCtxKey{})
-	if accesstoken == nil {
-		return errors.New("no accesstoken")
-	}
-	prefix := "/"
-
-	path := path.Clean("/" + req.Param("path"))
-	if p := req.URL.Query().Get("path"); p != "" {
-		path = p
-	}
-	fmt.Println("ServeReverseProxy", path, prefix, "access", accesstoken)
-
-	url, err := NewClient(accesstoken.(string), prefix).GetURL(path)
-	if err != nil {
-		return err
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(url)
-	req.URL.Host = url.Host
-	req.URL.Scheme = url.Scheme
-	req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
-	req.Host = url.Host
-	// w.Header().Set("access-control-allow-origin", "*")
-	proxy.ServeHTTP(w, req.Request)
-
-	return nil
-}
-
 func ServeReverseProxyMux(w http.ResponseWriter, r *http.Request) error {
-	fmt.Println("ServeReverseProxy")
+
 	// prefix, accesstoken, _ := auth.GetPrefixAndToken(req.Request)
 	accesstoken := hicookie(r)
 	prefix := "/"
 
-	path := path.Clean("/" + r.PathValue("path"))
+	pth := r.PathValue("path")
 	if p := r.URL.Query().Get("path"); p != "" {
-		path = p
+		pth = p
 	}
-	fmt.Println("ServeReverseProxy", path, prefix, "access", accesstoken)
+	pth = path.Clean("/" + pth)
 
-	url, err := NewClient(accesstoken, prefix).GetURL(path)
+	url, err := NewClient(accesstoken, prefix).GetURL(pth)
 	if err != nil {
 		return err
 	}
+	// fmt.Println("ServeReverseProxyMux", url.String())
 
 	proxy := httputil.NewSingleHostReverseProxy(url)
 	r.URL.Host = url.Host

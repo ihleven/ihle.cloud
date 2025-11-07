@@ -43,6 +43,7 @@ func IndexDoc(entry *content.Entry, level Level) interface{} {
 	// level == Fulltext || level == Extended
 
 	if augmenter, ok := entry.Content.(augmenter); ok {
+
 		augmentedDoc, err := augmenter.AugmentSearchDoc(&doc, level)
 		if augmentedDoc != nil {
 			// if entry.Type == "Destination" {

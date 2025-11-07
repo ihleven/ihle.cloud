@@ -43,7 +43,7 @@ func NewEngine(config Config, mappings map[string]*mapping.DocumentMapping) (eng
 		Config: config,
 	}
 
-	fmt.Printf("SEARCH ENGINE config: %+v\n", config)
+	// fmt.Printf("SEARCH ENGINE config: %+v\n", config)
 
 	if config.Level == Off {
 		return engine, nil
@@ -131,6 +131,7 @@ func (e *Engine) putEntries(entries []content.Entry) error {
 		entry := &entries[i]
 		fmt.Printf("\033[2K\rENTRY %d: %s", i, entry.Path)
 		doc := IndexDoc(entry, e.Config.Level)
+
 		// fmt.Println("TypeField:", e.mapping.TypeField, doc)
 
 		// // if _, ok := doc.(*Document); ok {
@@ -149,7 +150,7 @@ func (e *Engine) putEntries(entries []content.Entry) error {
 
 		err := batch.Index(entry.Path, doc)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Error in batch.Index %s", entry.Path)
 		}
 		// if big.NewInt(int64(i)).ProbablyPrime(0) {
 		// 	fmt.Printf("\033[2K\rIndexed %s", entry.ID)

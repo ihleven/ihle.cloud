@@ -25,7 +25,12 @@ func NewCMS(conf Config) (*CMS, error) {
 		return nil, err
 	}
 
-	engine, err := search.NewEngine(conf.Search, nil)
+	// mappings := map[string]*mapping.DocumentMapping{
+	// 	"Work":       art.Work{}.BleveMapping(),
+	// 	"exhibition": art.Ausstellung{}.BleveMapping(),
+	// }
+
+	engine, err := search.NewEngine(conf.Search, nil) // mappings)
 	if err != nil {
 		log.Fatalf("engine %v %s", conf, err)
 	}
@@ -58,7 +63,8 @@ func (cms *CMS) GetEntry(path string, usr content.User, resolve content.Resolv) 
 	if err != nil {
 		fmt.Println(err)
 		if errors.Code(err) == 404 {
-			return cms.GetDirEntries(path), nil
+			return cms.GetDirEntrySearch(path)
+			// return cms.GetDirEntries(path), nil
 		}
 		return nil, err
 	}
@@ -108,8 +114,14 @@ func (cms *CMS) GetEntry(path string, usr content.User, resolve content.Resolv) 
 
 }
 
+type DirEntry struct {
+	content.Meta
+	Dir string `json:"dir"`
+	Img string `json:"img"`
+}
+
 // GetDirEntry listet die Inhalte eines Verzeichnisses auf, indem es die Suche verwendet.
-func (cms *CMS) GetDirEntry(path string) (*content.Entry, error) {
+func (cms *CMS) GetDirEntrySearch(path string) (*content.Entry, error) {
 
 	entry := content.Entry{
 		Meta: content.Meta{
@@ -117,27 +129,55 @@ func (cms *CMS) GetDirEntry(path string) (*content.Entry, error) {
 			Name: gopath.Base(path),
 			Type: "Dir",
 		},
-		Content: []content.Meta{},
+		Content: []DirEntry{},
 	}
 
+	if path == "" {
+		path = "."
+	}
 	result, err := cms.Engine.Search(search.Params{Dir: path, Fields: "*", PageSize: 100000})
 	if err != nil {
 		return nil, err
 	}
 
 	if result.Total > 0 {
-
-		entries := []content.Meta{}
-
+		var entries []DirEntry
 		for _, hit := range result.Hits {
 
-			entries = append(entries, *search.Fields2Meta(hit.Fields))
-		}
+			var direntry DirEntry
 
+			if path, ok := hit.Fields["path"].(string); ok {
+				direntry.Path = path
+			}
+			if name, ok := hit.Fields["name"].(string); ok {
+				direntry.Name = name
+			}
+			if typ, ok := hit.Fields["type"].(string); ok {
+				direntry.Type = typ
+			}
+			if locale, ok := hit.Fields["locale"].(string); ok {
+				direntry.Locale = locale
+			}
+			if version, ok := hit.Fields["version"].(string); ok {
+				direntry.Version = version
+			}
+			if slug, ok := hit.Fields["slug"].(string); ok {
+				direntry.Slug = slug
+			}
+			if fullslug, ok := hit.Fields["full_slug"].(string); ok {
+				direntry.FullSlug = fullslug
+			}
+			if dir, ok := hit.Fields["dir"].(string); ok {
+				direntry.Dir = dir
+			}
+
+			entries = append(entries, direntry)
+		}
 		entry.Content = entries
 	}
 
 	return &entry, nil
+
 }
 
 // GetDirEntries listet die Inhalte eines Verzeichnisses auf, ohne die Einträge zu laden.
@@ -155,7 +195,9 @@ func (cms *CMS) GetDirEntries(path string) *content.Entry {
 	for _, name := range cms.Repo.Directories[path].Entries {
 
 		entries = append(entries, content.Meta{
-			Name: name, Path: path + "/" + name, ID: strings.TrimSuffix(name, gopath.Ext(name)),
+			Name: name,
+			Path: path + "/" + name,
+			ID:   strings.TrimSuffix(name, gopath.Ext(name)),
 		})
 
 	}

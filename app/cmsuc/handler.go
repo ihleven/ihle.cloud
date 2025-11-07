@@ -13,6 +13,7 @@ import (
 	"bitbucket.org/hotelplan/webcc-content/cms/content"
 	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/gitrepo"
 	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
+	"bitbucket.org/hotelplan/webcc-content/cms/permission"
 	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
 	"github.com/gorilla/schema"
 	"github.com/ihleven/ihle.cloud/pkg/auth"
@@ -24,11 +25,28 @@ func NewCMSApi(conf Config) (*Api, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Api{cms}, nil
+	return &Api{CMS: cms}, nil
 }
 
 type Api struct {
 	*CMS
+}
+
+func (a *Api) ReqAuth(r *http.Request) (*content.User, error) {
+	account, _, err := auth.GetAccountUnused(r)
+	if err != nil {
+		return nil, err
+	}
+
+	usr := content.User{
+		ID:     account.ID,
+		Groups: account.CMS.Groups,
+		Scope:  map[permission.Type]permission.Permission{},
+	}
+
+	usr.Scope.Add(account.CMS.Permissions, []string{}, []string{})
+
+	return &usr, nil
 }
 
 func JSON(w http.ResponseWriter, value interface{}) error {
@@ -126,12 +144,10 @@ func (a *Api) EntryDetails(w http.ResponseWriter, r *http.Request) error {
 // func (a *api) EntryUpdate(rw *web.ResponseWriter, r *http.Request) error {
 func (a *Api) EntryUpdate(w http.ResponseWriter, r *http.Request) error {
 
-	usr := content.User{}
-
-	// account, ok := ReqAuth(a, w)
-	// if !ok {
-	// 	return errors.NewWithCode(401, "Could not find account")
-	// }
+	usr, err := a.ReqAuth(r)
+	if err != nil {
+		return errors.WrapWithCode(err, 401, "Could not find account")
+	}
 
 	now := time.Now()
 	mode := r.URL.Query().Get("mode")
@@ -166,7 +182,7 @@ func (a *Api) EntryUpdate(w http.ResponseWriter, r *http.Request) error {
 		return errors.NewWithCode(400, "!valid && !force")
 	}
 
-	changeset, err := a.UpdateEntry(r.PathValue("path"), entry, &usr)
+	changeset, err := a.CMS.UpdateEntry(r.PathValue("path"), entry, usr)
 	if err != nil {
 		return err
 	}
@@ -227,5 +243,47 @@ func SearchEntries(cms *CMS) func(http.ResponseWriter, *http.Request) error {
 		}
 
 		return JSON(w, search.NewResult(result))
+	}
+}
+
+func EntryLookup(cms *CMS) func(http.ResponseWriter, *http.Request) error {
+
+	return func(w http.ResponseWriter, r *http.Request) error {
+
+		if cms.Engine == nil {
+			return errors.NewWithCode(http.StatusNotImplemented, "search not implemented")
+		}
+
+		params, err := ParseWithDefaults(r.URL.Query(), search.Params{})
+		if err != nil {
+			return err
+		}
+
+		params.PageSize = 1
+
+		result, err := cms.Engine.Search(params)
+		if err != nil {
+			return err
+		}
+
+		if result.Total != 1 {
+			return errors.NewWithCode(404, "not found or not unique")
+		}
+
+		// entry, err := cms.Repo.GetBytes(result.Hits[0].ID, false)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// w.Header().Set("ContentType", "application/json")
+		// n, err := w.Write(entry)
+		// fmt.Print("%d bytes written", n)
+		// return err
+
+		entry, err := cms.Repo.GetEntry(result.Hits[0].ID)
+		if err != nil {
+			return err
+		}
+		return JSON(w, entry)
 	}
 }

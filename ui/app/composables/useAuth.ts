@@ -1,9 +1,16 @@
 type Session = {
+  iss: string
+  sub: string
+  aud: string | string[]
+  exp: number
+  nbf: number
+  iat: number
+  permissions: Record<string, object>
   name: string
   email: string
-  exp: number
   expiry?: Date
   expires_in?: number
+  last_notification: number | undefined
 }
 
 type UseAuthOptions = {
@@ -11,6 +18,7 @@ type UseAuthOptions = {
   interval?: number
   debug?: boolean
 }
+
 function sessionDuration(session: Session): number {
   if (!session?.exp)
     return 0
@@ -23,6 +31,7 @@ export const useAuth = (options?: UseAuthOptions) => {
   const config = useRuntimeConfig()
   const toast = useToast()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function debugLog(message?: any, ...optionalParams: any[]) {
     if (options?.debug)
       console.log(message, ...optionalParams)
@@ -30,34 +39,35 @@ export const useAuth = (options?: UseAuthOptions) => {
 
   const session = useState<Session | undefined>('session')
 
-  const intervalState = useState<number | undefined>('intervalstate')
+  // const intervalState = useState<number | undefined>('intervalstate')
 
   function init() {
-    if (intervalState.value !== undefined) {
+    debugLog('init', session.value?.last_notification)
+    if (session.value?.last_notification !== undefined) {
       debugLog('useAuth: already initialized')
       return
     }
 
     setInterval(() => {
-      debugLog(' * session interval => ', session.value?.expires_in, '/', intervalState.value)
+      debugLog(' * session interval => ', session.value?.expires_in, '/', session.value?.last_notification)
       if (!session.value)
         return
 
-      const duration = sessionDuration(session.value)
+      session.value.expires_in = sessionDuration(session.value)
 
-      session.value.expires_in = duration
-      if (duration <= 30 && (!intervalState.value || intervalState.value > 30)) {
-        toast.add({ title: 'Session expiring soon', description: 'Your Session will expire in ' + duration + ' seconds' })
-        intervalState.value = 30
-      }
-      if (duration <= 0 && (intervalState.value)) {
-        console.log('expired ')
-        intervalState.value = 0
+      if (session.value.expires_in <= 0) {
         clearSession()
+        return
+      }
+
+      for (const i of [10, 60, 300, 600, 3600]) {
+        if (session.value.expires_in <= i && (session.value.last_notification === undefined || session.value.last_notification > i)) {
+          toast.add({ title: 'Session expiring soon', description: 'Your Session will expire in ' + formatDuration(i) })
+          session.value.last_notification = i
+          return
+        }
       }
     }, (options?.interval ?? 5) * 1000)
-
-    intervalState.value = Number.MAX_SAFE_INTEGER
   }
   if (options?.init) {
     console.log('useAuth init')
@@ -75,11 +85,14 @@ export const useAuth = (options?: UseAuthOptions) => {
       if (session.value) {
         session.value.expiry = new Date(session.value.exp * 1000)
         session.value.expires_in = sessionDuration(session.value)
-        console.log('loaded session => ', data)
+        session.value.last_notification = undefined
+        debugLog('loaded session => ', data)
       }
     }
     catch (e) {
-      console.error('=>', e)
+      // if (e.status !== 401) {
+      console.error(' *** session error => ', e.data)
+      // }
       session.value = undefined
     }
   }

@@ -72,6 +72,15 @@ func (e *Entry) Update(data Entry, user User) (Changeset, error) {
 		return nil, errors.WrapWithCode(err, 400, "not a valid update")
 	}
 	e.Content = data.Content
+	e.Meta.Name = data.Meta.Name
+	e.Meta.Notes = data.Meta.Notes
+	e.Meta.Slug = data.Meta.Slug
+	e.Meta.FullSlug = data.Meta.FullSlug
+	e.Meta.Status = data.Meta.Status
+	e.Meta.Tags = make([]string, len(data.Meta.Tags))
+	copy(e.Meta.Tags, data.Meta.Tags)
+	e.Meta.Name = data.Meta.Name
+	e.Meta.Name = data.Meta.Name
 	// ... weitere Metadata
 
 	return Changeset{e.Path: e}, nil

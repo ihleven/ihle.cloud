@@ -15,7 +15,6 @@ func New(conn string) (*DB, error) {
 		return nil, fmt.Errorf("no db connection string provided")
 	}
 	dbpool, err := pgxpool.New(context.Background(), conn)
-	fmt.Println("dbpool:", dbpool, "err:", err)
 	if err != nil {
 		return nil, err
 	}
@@ -49,3 +48,7 @@ func (r *DB) Select(dst interface{}, query string, args ...interface{}) error {
 	}
 	return nil
 }
+
+// func QueryGeneric[K comparable](db *DB, stmt string, params ...interface{}) (K, error) {
+
+// }

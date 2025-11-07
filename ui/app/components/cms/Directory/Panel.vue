@@ -55,6 +55,16 @@
         />
       </aside>
     </main>
+
+    <section v-else-if="entry.type==='Super8'" class="p-4">
+      <img
+        :src="entry.content.thumbnail"
+        class="bg-black text-gray-500"
+      >
+      {{ entry.content }}
+
+    </section>
+
     <section
       v-else-if="entry.type==='Person'"
       class="p-4"

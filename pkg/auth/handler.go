@@ -64,7 +64,13 @@ func Login(w http.ResponseWriter, r *http.Request) error {
 	}
 	// http.Redirect(w, r, r.Referer(), http.StatusFound)
 	// return nil
-	return RespondJSON(w, claims)
+
+	response := struct {
+		*Claims
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}{Claims: &claims, Name: account.Name, Email: account.Email}
+	return RespondJSON(w, response)
 }
 
 var permissions map[string]string = map[string]string{
@@ -148,13 +154,19 @@ func Session(w http.ResponseWriter, r *http.Request) error {
 
 	var response = struct {
 		*Claims
-		Account *Account
+		// Account *Account
+		Name  string `json:"name"`
+		Email string `json:"email"`
 	}{Claims: claims}
 	// claims.Permissions = map[string]string{"foo": "bar"}
-	if r.URL.Query().Has("account") {
-		response.Account = AuthenticatorPKG.accounts[claims.Subject]
-
+	// if r.URL.Query().Has("account") {
+	account, ok := AuthenticatorPKG.accounts[claims.Subject]
+	if ok {
+		response.Name = account.Name
+		response.Email = account.Email
 	}
+
+	// }
 	// account, accesstoken, err := GetAccessFromClaims(claims)
 	// account := AuthenticatorPKG.Account(claims.Subject)
 	// fmt.Println("GetAccessFromClaims", account)
@@ -164,6 +176,18 @@ func Session(w http.ResponseWriter, r *http.Request) error {
 	// 	token := AuthenticatorPKG.m[account.Settings.Hidrive.Alias]
 	// 	response["token"], _ = token.GetAccessToken()
 	// }
+
+	access_token, err := AuthenticatorPKG.GetToken(account)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:  "hitoken",
+		Value: access_token,
+		Path:  "/",
+		// MaxAge:   token.ExpiresIn,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
+	})
 
 	return RespondJSON(w, response)
 }

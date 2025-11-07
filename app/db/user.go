@@ -8,19 +8,19 @@ import (
 
 func (db *DB) GetUser(id string) (*auth.Account, error) {
 
-	row := db.pool.QueryRow(context.Background(), "SELECT email,name,credentials,hidrive FROM account WHERE name = $1", id)
+	row := db.pool.QueryRow(context.Background(), "SELECT email,name,display_name,credentials,hidrive FROM account WHERE name = $1", id)
 	// if err != nil {
 	// 	return nil, err
 	// }
 	// defer rows.Close()
 
-	var email string
+	// var email string
 	// var credentials auth.Credentials
 	var account auth.Account
 
 	// for rows.Next() {
 
-	err := row.Scan(&email, &account.ID, &account.Credentials, &account.Settings.Hidrive)
+	err := row.Scan(&account.Email, &account.ID, &account.Name, &account.Credentials, &account.Settings.Hidrive)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,13 @@ func (db *DB) GetUser(id string) (*auth.Account, error) {
 }
 func (db *DB) LoadAccounts() ([]auth.Account, error) {
 
-	rows, err := db.pool.Query(context.Background(), "SELECT email,name,credentials,hidrive FROM account")
+	sql := `
+        SELECT a.email,a.name,a.display_name,a.credentials,a.hidrive, cms.groups,cms.permissions
+          FROM account a, cmsauth cms
+		 WHERE a.name=cms.id
+    `
+
+	rows, err := db.pool.Query(db.ctx, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -40,14 +46,13 @@ func (db *DB) LoadAccounts() ([]auth.Account, error) {
 	var accounts []auth.Account
 
 	for rows.Next() {
-		var email string
-		// var credentials auth.Credentials
-		var account auth.Account
-		err := rows.Scan(&email, &account.ID, &account.Credentials, &account.Settings.Hidrive)
+
+		var a auth.Account
+		err := rows.Scan(&a.Email, &a.ID, &a.Name, &a.Credentials, &a.Settings.Hidrive, &a.Settings.CMS.Groups, &a.Settings.CMS.Permissions)
 		if err != nil {
 			return nil, err
 		}
-		accounts = append(accounts, account)
+		accounts = append(accounts, a)
 	}
 
 	return accounts, nil

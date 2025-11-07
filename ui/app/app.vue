@@ -34,7 +34,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent, AuthFormField } from '@nuxt/ui'
 
 const { toaster } = useAppConfig()
-const { session, loadSession, loginajax } = useAuth()
+const { session, loginajax } = useAuth()
 // await loadSession()
 
 const fields: AuthFormField[] = [{

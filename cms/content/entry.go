@@ -1,6 +1,8 @@
 package content
 
 import (
+	"bytes"
+
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 
 	"bitbucket.org/hotelplan/webcc-content/cms/permission"
 	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
+	"github.com/goccy/go-yaml"
 )
 
 // Entry ist der Wrapper für alle Inhalte.
@@ -83,6 +86,36 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 		e.Content = t
 	} else {
 		return errors.Wrap(err, "Type not registered: %s", aux.Meta.Type)
+	}
+
+	return nil
+}
+
+func (e *Entry) UnmarshalYAML(data []byte) error {
+
+	if e == nil {
+		return nil
+	}
+
+	metapath, err := yaml.PathString("$.meta")
+	if err != nil {
+		return errors.Wrap(err, "Couldn't create meta path")
+	}
+
+	if err := metapath.Read(bytes.NewReader(data), &e.Meta); err != nil {
+		return errors.Wrap(err, "Couldn't parse meta block")
+	}
+
+	e.Content, err = Instantiate(e.Meta.Type)
+	if err != nil {
+		return errors.Wrap(err, "Type not registered: %s", e.Meta.Type)
+	}
+	contentpath, err := yaml.PathString("$.content")
+	if err != nil {
+		return errors.Wrap(err, "Couldn't create content path")
+	}
+	if err := contentpath.Read(bytes.NewReader(data), e.Content); err != nil {
+		return errors.Wrap(err, "Couldn't parse content block")
 	}
 
 	return nil

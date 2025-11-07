@@ -18,12 +18,18 @@ export function formatTime(d: Date) {
   return new Date(d).toLocaleTimeString('de', {})
 }
 
-export function formatDuration(seconds: number) {
-  const minutes = Math.floor(seconds / 60)
-  const remainder = seconds % 60
-  const hours = seconds / 3600
+export function formatDuration(dur_in_seconds: number) {
+  const minutes = Math.floor(dur_in_seconds / 60)
+  const seconds = dur_in_seconds % 60
+  const hours = Math.floor(dur_in_seconds / 3600)
 
-  return minutes ? `${minutes}m${remainder}s` : `${seconds}s`
+  if (hours)
+    return `${hours}h${minutes % 60}m${seconds}s`
+
+  if (minutes)
+    return `${minutes}m${seconds}s`
+
+  return `${seconds}s`
 }
 
 export function formatBytes(bytes: number, decimals = 2) {

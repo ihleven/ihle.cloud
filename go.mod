@@ -1,12 +1,12 @@
 module github.com/ihleven/ihle.cloud
 
-go 1.24.0
+go 1.25
 
 replace bitbucket.org/hotelplan/webcc-content/cms => ./cms
 
 require (
 	bitbucket.org/hotelplan/webcc-content/cms v1.24.0
-	github.com/alexflint/go-arg v1.5.1
+	github.com/alexflint/go-arg v1.6.0
 	github.com/blevesearch/bleve/v2 v2.4.2
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/fatih/color v1.18.0
@@ -59,6 +59,7 @@ require (
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
 	github.com/go-git/go-git/v5 v5.10.0 // indirect
+	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
