@@ -19,7 +19,7 @@ ui:
 	cd ui; bun install; bun run generate
 
 build: 
-	CGO_ENABLED=0 go build -o ${OUT} -ldflags=${LDFLAGS} 
+	@CGO_ENABLED=0 go build -o ${OUT} -ldflags=${LDFLAGS} 
 
 run:
 	@CGO_ENABLED=0 go run -ldflags=${LDFLAGS} main.go
@@ -39,14 +39,12 @@ cms:
 	cp ../../src/webcc-content/cms/content/* ./cms/content
 
 clean:
-	-@rm ${OUT} ihlvn-linux-amd64 gin-bin
-	-@rm -rf docs/.data 
-	-@rm -rf docs/.nuxt 
-	-@rm -rf docs/.output 
-	-@rm -rf docs/dist 
-	-@rm -rf docs/node_modules 
+	-@rm ${OUT} ${OUT}-linux-amd64 gin-bin
+	-@rm -rf ui/.nuxt 
+	-@rm -rf ui/.output 
+	-@rm -rf ui/node_modules 
 
-.PHONY: all ui build run install linux opalstack cms
+.PHONY: all version ui build run install linux opalstack cms clean
 
 
 

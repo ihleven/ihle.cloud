@@ -1,0 +1,28 @@
+content:
+  rezepte:
+    schneegestöber:
+      title: Schneegestöber
+      description: Ein köstliches Dessert, das an verschneite Wintertage erinnert.
+      ingredients:
+        - 200g weiße Schokolad
+        - 400ml Sahne
+        - 2 EL Zucker
+        - 2 PKG Vanillezucker
+        - 500g tiefgefrorene Himbeeren
+      instructions:
+        - Schritt 1: Die weiße Schokolade grob hacken und in einer hitzebeständigen Schüssel beiseite stellen.
+        - Schritt 2: Die Sahne in einem Topf erhitzen, bis sie kurz vor dem Kochen steht. Den Zucker und Vanilleextrakt hinzufügen und gut umrühren.
+        - Schritt 3: Die heiße Sahne über die gehackte Schokolade gießen und einige Minuten stehen lassen, damit die Schokolade schmilzt.
+        - Schritt 4: Die Mischung glatt rühren, bis eine homogene Masse entsteht. Anschließend abkühlen lassen.
+        - Schritt 5: Die abgekühlte Mischung in den Kühlschrank stellen und mindestens 4 Stunden, besser über Nacht, kalt stellen.
+        - Schritt 6: Vor dem Servieren die gekühlte Masse mit einem Handmixer aufschlagen, bis sie luftig und cremig ist.
+        - Schritt 7: In Dessertgläser füllen und mit frischen Beeren garnieren. Sofort servieren und genießen!
+      notes:
+        - Tipp: Für eine festere Konsistenz kann etwas Gelatine hinzugefügt werden.
+        - Variation: Statt weißer Schokolade kann auch dunkle Schokolade verwendet werden für eine intensivere Geschmacksnote.
+      prep_time: 15 Minuten
+      cook_time: 5 Minuten
+      chill_time: 4 Stunden
+      servings: 4 Portionen
+      category: Dessert
+      cuisine: International

@@ -10,8 +10,8 @@ import (
 
 	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
 	"github.com/fatih/color"
-	"github.com/ihleven/ihle.cloud/pkg/auth"
-	"github.com/ihleven/ihle.cloud/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/auth"
+	"github.com/ihleven/ihlvn/pkg/hi"
 	jubcors "github.com/jub0bs/cors"
 	"github.com/uptrace/bunrouter"
 )

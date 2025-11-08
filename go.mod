@@ -1,4 +1,4 @@
-module github.com/ihleven/ihle.cloud
+module github.com/ihleven/ihlvn
 
 go 1.25
 

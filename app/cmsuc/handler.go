@@ -16,7 +16,7 @@ import (
 	"bitbucket.org/hotelplan/webcc-content/cms/permission"
 	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
 	"github.com/gorilla/schema"
-	"github.com/ihleven/ihle.cloud/pkg/auth"
+	"github.com/ihleven/ihlvn/pkg/auth"
 )
 
 func NewCMSApi(conf Config) (*Api, error) {

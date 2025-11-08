@@ -9,30 +9,27 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/ihleven/ihle.cloud/app/art/importart"
-	"github.com/ihleven/ihle.cloud/app/db"
-	"github.com/ihleven/ihle.cloud/app/super8"
-	"github.com/ihleven/ihle.cloud/pkg/cmd"
-	"github.com/ihleven/ihle.cloud/pkg/mail"
-	"github.com/ihleven/ihle.cloud/pkg/spa"
+	"github.com/ihleven/ihlvn/app/art/importart"
+	"github.com/ihleven/ihlvn/app/db"
+	"github.com/ihleven/ihlvn/app/super8"
+	"github.com/ihleven/ihlvn/pkg/cmd"
+	"github.com/ihleven/ihlvn/pkg/mail"
+	"github.com/ihleven/ihlvn/pkg/spa"
 	"github.com/moby/moby/pkg/pidfile"
 
 	"bitbucket.org/hotelplan/webcc-content/cms/content"
 	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
 
 	"github.com/alexflint/go-arg"
-	"github.com/ihleven/ihle.cloud/app/art"
-	"github.com/ihleven/ihle.cloud/app/cmsuc"
-	"github.com/ihleven/ihle.cloud/app/familie"
-	"github.com/ihleven/ihle.cloud/pkg/api"
-	"github.com/ihleven/ihle.cloud/pkg/auth"
-	"github.com/ihleven/ihle.cloud/pkg/hi"
+	"github.com/ihleven/ihlvn/app/art"
+	"github.com/ihleven/ihlvn/app/cmsuc"
+	"github.com/ihleven/ihlvn/app/familie"
+	"github.com/ihleven/ihlvn/pkg/api"
+	"github.com/ihleven/ihlvn/pkg/auth"
+	"github.com/ihleven/ihlvn/pkg/hi"
 
 	_ "github.com/joho/godotenv/autoload"
 )
-
-// ih-app
-// ihlvn-api / ihlvn-app / ihlvn-cloud
 
 var (
 	BUILD_DIR       string
@@ -64,10 +61,6 @@ type Flags struct {
 
 }
 
-func (RootCmd) Version() string {
-	return cmd.Info.Version.String()
-}
-
 type RootCmd struct {
 	// *ServerCmd `arg:"subcommand:server"`
 	*importart.ImportCmd `arg:"subcommand:import"`
@@ -76,6 +69,10 @@ type RootCmd struct {
 	// root cmd flags
 	Port  int  `arg:"-p,--port,env:PORT" default:"8000"   help:"Port numbe"` // default:"10815"
 	Clone bool `arg:"--clone"`
+}
+
+func (RootCmd) Version() string {
+	return cmd.Info.Version.String()
 }
 
 func main() {
@@ -117,12 +114,11 @@ func main() {
 }
 
 func (flags Flags) cmsConfig() cmsuc.Config {
-	conf := cmsuc.Config{
+	return cmsuc.Config{
 		RepoContent: flags.RepoContent,
 		DataDir:     flags.DataDir,
 		Search:      search.Config{Level: search.ParseLevel(flags.SearchLevel), DataDirPath: flags.DataDir, IndexName: flags.SearchDir},
 	}
-	return conf
 }
 
 func (cmd *RootCmd) RunServer(flags Flags) error {

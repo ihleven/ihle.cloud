@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ihleven/ihle.cloud/app/art"
-	"github.com/ihleven/ihle.cloud/app/art/importart/db"
+	"github.com/ihleven/ihlvn/app/art"
+	"github.com/ihleven/ihlvn/app/art/importart/db"
 
 	"bitbucket.org/hotelplan/webcc-content/cms/content"
 	"github.com/jackc/pgx/v5/pgxpool"

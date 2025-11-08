@@ -7,8 +7,8 @@ import (
 	"path"
 
 	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
-	"github.com/ihleven/ihle.cloud/pkg/auth"
-	"github.com/ihleven/ihle.cloud/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/auth"
+	"github.com/ihleven/ihlvn/pkg/hi"
 )
 
 func ServeHiVideo(w http.ResponseWriter, r *http.Request) error {

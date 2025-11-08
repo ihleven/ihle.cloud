@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ihleven/ihle.cloud/pkg/auth"
-	"github.com/ihleven/ihle.cloud/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/auth"
+	"github.com/ihleven/ihlvn/pkg/hi"
 )
 
 func FileHandler(w http.ResponseWriter, r *http.Request) {
