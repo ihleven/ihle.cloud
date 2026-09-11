@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
 	"github.com/blevesearch/bleve/v2"
 	blevesearch "github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/interhome-group/cms/mgmt/search"
 )
 
 type ExtParams struct {

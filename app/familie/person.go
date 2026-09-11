@@ -3,15 +3,28 @@ package familie
 import (
 	"fmt"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/content"
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/mapping"
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
+	"github.com/interhome-group/cms/content"
+	"github.com/interhome-group/cms/mgmt/search"
 )
 
+// Frontmatter is the YAML envelope of a markdown entry: the CMS metadata
+// inline, plus the content type's own fields under `content`.
+//
+// This used to be content.Frontmatter. The CMS no longer has a per-content-type
+// markdown codec — frontmatter is now decoded typed in a single pass — so the
+// MarshalMarkdown/UnmarshalMarkdown methods below are no longer called by
+// anything in the CMS. The type is kept here so the code still compiles and
+// still says what it meant; the methods are dead and could be deleted.
+type Frontmatter struct {
+	Meta    content.Meta   `yaml:",inline"`
+	Content map[string]any `yaml:"content"`
+}
+
 type Person struct {
-	content.ContentType `type:"Person" json:"-" yaml:"-" mimetype:"text/markdown"`
+	content.EntryContent `type:"Person" json:"-" yaml:"-" mimetype:"text/markdown"`
 
 	Key        string `json:"key"`
 	Geburtstag string `json:"geburtstag"`
@@ -37,7 +50,7 @@ func (p *Person) MarshalMarkdown(meta content.Meta) ([]byte, error) {
 	return []byte(fmt.Sprintf("---\n%s---\n%s\n", matterbytes, p.Content)), nil
 }
 
-func (p *Person) UnmarshalMarkdown(data []byte, matter *content.Frontmatter) error {
+func (p *Person) UnmarshalMarkdown(data []byte, matter *Frontmatter) error {
 
 	bytes, err := yaml.Marshal(matter.Content)
 	if err != nil {

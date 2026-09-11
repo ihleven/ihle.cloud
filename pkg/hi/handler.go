@@ -107,7 +107,6 @@ func FileHandler_Dep(w http.ResponseWriter, req bunrouter.Request) error {
 	for key, val := range resp.Header {
 		w.Header().Set(key, val[0])
 	}
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 	w.Header().Set("Content-Disposition", "inline")
 
 	w.WriteHeader(resp.StatusCode)
@@ -137,7 +136,6 @@ func FileHandlerMux(w http.ResponseWriter, r *http.Request) error {
 	for key, val := range resp.Header {
 		w.Header().Set(key, val[0])
 	}
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 	w.Header().Set("Content-Disposition", "inline")
 
 	w.WriteHeader(resp.StatusCode)

@@ -3,15 +3,13 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
 	"github.com/fatih/color"
-	"github.com/ihleven/ihlvn/pkg/auth"
 	"github.com/ihleven/ihlvn/pkg/hi"
+	"github.com/interhome-group/cms/pkg/errs"
 	jubcors "github.com/jub0bs/cors"
 	"github.com/uptrace/bunrouter"
 )
@@ -73,30 +71,32 @@ func Handler(pattern string, h http.Handler) func(*Api) {
 	}
 }
 
-func (a *Api) ListenAndServe(port int, origins []string) error {
+// ListenAndServe serves the API, granting cross-site access to origins.
+//
+// No origins is the normal case: this app serves its own frontend, so the
+// browser is always talking to the origin it loaded the page from and CORS does
+// not enter into it. A grant is only needed for a separately hosted client, and
+// then it has to be named — credentialed CORS cannot use a wildcard, and a
+// default of "some development port" would be a grant nobody asked for.
+func (a *Api) ListenAndServe(port int, origins []string, debug bool) error {
 
-	if len(origins) == 0 {
-		origins = []string{"http://localhost:3000"}
+	handler := http.Handler(a.routr)
+
+	if len(origins) > 0 {
+		corsMw, err := jubcors.NewMiddleware(jubcors.Config{
+			Origins:        origins,
+			Methods:        []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
+			RequestHeaders: []string{"Authorization", "Content-Type"},
+			Credentialed:   true,
+		})
+		if err != nil {
+			return fmt.Errorf("configuring CORS for %v: %w", origins, err)
+		}
+		corsMw.SetDebug(debug)
+		handler = corsMw.Wrap(a.routr)
 	}
 
-	corsMw, err := jubcors.NewMiddleware(jubcors.Config{
-		Origins:        origins,
-		Methods:        []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
-		RequestHeaders: []string{"Authorization", "Content-Type"},
-		Credentialed:   true,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	corsMw.SetDebug(true) // optional: turn debug mode on
-
-	// handler := cors.New(cors.Options{
-	// 	AllowedOrigins:   []string{"http://localhost:3000"},
-	// 	AllowCredentials: true,
-	// 	Debug:            true, // Enable Debugging for testing, consider disabling in production
-	// }).Handler(a.routr)
-
-	return http.ListenAndServe(fmt.Sprintf(":%d", port), corsMw.Wrap(a.routr))
+	return http.ListenAndServe(fmt.Sprintf(":%d", port), handler)
 }
 
 func JSON(w http.ResponseWriter, value interface{}) error {
@@ -145,9 +145,9 @@ func errmw(next func(http.ResponseWriter, *http.Request) error) func(http.Respon
 			w.WriteHeader(err.HTTPStatus)
 			_ = bunrouter.JSON(w, err)
 		default:
-			fmt.Println("errmw =>", errors.Code(err), errors.Cause(err), err)
+			fmt.Println("errmw =>", errs.StatusOf(err), errs.Cause(err), err)
 
-			statusCode = errors.Code(err)
+			statusCode = errs.StatusOf(err)
 			if statusCode == 0 {
 				statusCode = 500
 			}
@@ -199,23 +199,4 @@ func SplitPath(p string) (head, tail string) {
 		return p[0:i], p[i+1:]
 	}
 	return p, ""
-}
-func GetAccessFromClaims(claims *auth.Claims) (*auth.Account, string, error) {
-	fmt.Println("GetAccessFromClaims")
-	account := auth.AuthenticatorPKG.Account(claims.Subject)
-	fmt.Println("GetAccessFromClaims", account)
-	token, err := auth.AuthenticatorPKG.GetToken(account)
-	fmt.Println("GetAccessFromClaims", token, err)
-
-	fmt.Println("GetAccessFromClaims")
-	return account, token, err
-}
-func getPermissionForPath(path string) string {
-	fmt.Println("getPermissionForPath", path)
-	if strings.HasPrefix(path, "public/djvet") {
-		return "djvet"
-	} else if strings.HasPrefix(path, "public/mediathek") {
-		return "mediathek"
-	}
-	return "other"
 }

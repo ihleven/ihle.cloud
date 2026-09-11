@@ -2,6 +2,11 @@
 @import "@nuxt/ui";
 @plugin '@tailwindcss/typography';
 
+/* Tailwind scans from app/ only, so classes that exist nowhere but the CMS entry
+   layer — arbitrary values like pl-[8ch] among them — would silently not be
+   generated. */
+@source "../../../../../cms/ui/layers/entry";
+
 :root {
   --ui-header-height: --spacing(12);
 }

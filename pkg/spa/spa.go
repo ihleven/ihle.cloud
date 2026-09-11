@@ -13,7 +13,62 @@ func Serve(path string) http.Handler {
 	fileServer := http.FileServer(fs)
 	serveIndex := serveFileContents("index.html", fs)
 
-	return intercept404(fileServer, serveIndex)
+	return withCaching(intercept404(fileServer, serveIndex))
+}
+
+// withCaching splits the build into the two things it actually contains.
+//
+// Asset filenames carry a content hash, so a given URL never changes and may be
+// cached indefinitely. The HTML that names them must not be: it keeps the same
+// URL across deploys, and a browser holding an old copy loads the old assets and
+// runs a version of the app that is no longer deployed.
+//
+// Without this the only header is Last-Modified, which leaves browsers free to
+// guess a freshness lifetime — and they do.
+//
+// The value is written when the status is, not before: http.ServeContent strips
+// Cache-Control when it errors, and an unknown path reaches the shell precisely
+// by way of such an error. Setting it up front would work everywhere except the
+// SPA's own routes, which is where it matters most.
+func withCaching(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(&cachingWriter{ResponseWriter: w, path: r.URL.Path}, r)
+	})
+}
+
+type cachingWriter struct {
+	http.ResponseWriter
+	path    string
+	written bool
+}
+
+func (w *cachingWriter) WriteHeader(status int) {
+	w.setCacheControl()
+	w.ResponseWriter.WriteHeader(status)
+}
+
+// Write covers a handler that never calls WriteHeader explicitly, where the
+// status is implied by the first write.
+func (w *cachingWriter) Write(p []byte) (int, error) {
+	w.setCacheControl()
+	return w.ResponseWriter.Write(p)
+}
+
+func (w *cachingWriter) setCacheControl() {
+	if w.written {
+		return
+	}
+	w.written = true
+
+	// Asset filenames carry a content hash, so the URL never changes contents.
+	// Everything else is the shell, which keeps its URL across deploys.
+	if strings.HasPrefix(w.path, "/_nuxt/") || strings.HasPrefix(w.path, "/_fonts/") {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		return
+	}
+	// no-cache permits storing but requires revalidation, so an unchanged page
+	// still costs only a 304.
+	w.Header().Set("Cache-Control", "no-cache")
 }
 
 // https://hackandsla.sh/posts/2021-11-06-serve-spa-from-go/

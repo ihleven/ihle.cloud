@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/ihleven/ihlvn/app/art/importart"
+	"github.com/ihleven/ihlvn/app/cmsapi"
 	"github.com/ihleven/ihlvn/app/db"
 	"github.com/ihleven/ihlvn/app/super8"
 	"github.com/ihleven/ihlvn/pkg/cmd"
@@ -17,15 +23,15 @@ import (
 	"github.com/ihleven/ihlvn/pkg/spa"
 	"github.com/moby/moby/pkg/pidfile"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/content"
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
+	"github.com/interhome-group/cms/content"
+	"github.com/interhome-group/cms/mgmt"
+	"github.com/interhome-group/cms/mgmt/search"
+	"github.com/interhome-group/cms/pkg/errs"
 
 	"github.com/alexflint/go-arg"
 	"github.com/ihleven/ihlvn/app/art"
-	"github.com/ihleven/ihlvn/app/cmsuc"
 	"github.com/ihleven/ihlvn/app/familie"
 	"github.com/ihleven/ihlvn/pkg/api"
-	"github.com/ihleven/ihlvn/pkg/auth"
 	"github.com/ihleven/ihlvn/pkg/hi"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -39,32 +45,37 @@ var (
 )
 
 type Flags struct {
-	Port                int    `arg:"-p,--port,               env"                  default:"8000"  help:"Port number"`
 	HidriveClientID     string `arg:"--hidrive-client-id,     env:CLIENT_ID"        placeholder:"ID"`
 	HidriveClientSecret string `arg:"--hidrive-client-secret, env:CLIENT_SECRET"    placeholder:"SECRET"`
 	RepoContent         string `arg:"                         env:REPO_CONTENT"     placeholder:"URL" `
 	DataDir             string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
 	SearchLevel         string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
-	SearchDir           string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, leave empty for in mem index" placeholder:"DIR"`
+	SearchDir           string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
+	SearchIndex         string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
 
 	JWTIssuer      string        `arg:"--jwt-issuer,env:JWT_ISSUER"                         default:"ihle.cloud" placeholder:"ISSUER"`
 	JWTSecretKey   string        `arg:"--jwt-secret,env:JWT_SECRET_KEY"                                          placeholder:"KEY"`
 	JWTDuration    int           `arg:"--jwt-duration,env:JWT_DURATION"        default:"36000" help:"Duration of JWT token in seconds"`
 	CookieName     string        `arg:"env:COOKIE_NAME"                        default:"jwt"  help:"Name for auth cookie"`
 	CookieSameSite http.SameSite `arg:"env:COOKIE_SAME_SITE"                   default:"2"    help:"SameSite attribute of auth cookie: Default (1) Lax (2), Strict (3), None (4)"`
+	CookieSecure   *bool         `arg:"env:COOKIE_SECURE"                                     help:"mark auth cookies Secure. Unset derives it from PUBLIC_URL's scheme, which is almost always what you want"`
+	PublicURL      string        `arg:"--public-url,env:PUBLIC_URL"            default:"http://localhost:8000" placeholder:"URL" help:"the URL a browser reaches this app at. Behind a proxy this is the public https URL, not the local port. Passkey, cookie and OAuth settings derive from it"`
+	CorsOrigins    []string      `arg:"--cors-origin,env:CORS_ORIGINS"                        help:"origins allowed to call this app cross-site. Empty is correct when the app serves its own frontend"`
 	DbConn         string        `arg:"env:DB_CONN"                            default:"postgres://localhost:5432/authdb" placeholder:"CONN"`
+	PasskeyRPID    string        `arg:"--passkey-rpid,env:PASSKEY_RPID"        default:"" help:"WebAuthn relying party id. Unset derives it from PUBLIC_URL's host; set it to a parent domain to share credentials across subdomains" placeholder:"HOST"`
+	PasskeyOrigins []string      `arg:"--passkey-origin,env:PASSKEY_ORIGINS"   help:"origins a passkey ceremony may come from. Unset derives PUBLIC_URL" placeholder:"URL"`
 	Pidfile        string        `arg:"--pid-file,   env:PIDFILE"              default:"" placeholder:"FILENAME"`
 	SPAPath        string        `arg:"--spa-path,   env:SPA_PATH"             default:"ui/.output/public" placeholder:"DIR" help:"path to nuxt spa"`
-	// 	Debug        bool   `arg:"-d,--debug,env"      default:"false"          help:"Enable debug mode"`
+	Debug          bool          `arg:"-d,--debug,env:DEBUG" help:"verbose diagnostics, including CORS decisions"`
 	// 	Pretty       bool   `arg:"--pretty,env:LOG_PRETTY"                      help:"Enable pretty logging"`
 	// 	Verbose      bool   `arg:"-v,--verbose,env"                             help:"Enable verbose mode"`
-
 }
 
 type RootCmd struct {
 	// *ServerCmd `arg:"subcommand:server"`
 	*importart.ImportCmd `arg:"subcommand:import"`
 	*mail.MailCmd        `arg:"subcommand:mail"`
+	*AccountCmd          `arg:"subcommand:account"`
 
 	// root cmd flags
 	Port  int  `arg:"-p,--port,env:PORT" default:"8000"   help:"Port numbe"` // default:"10815"
@@ -96,28 +107,39 @@ func main() {
 
 	p := arg.MustParse(&root, &flags)
 
-	handle_pidfile(flags.Pidfile)
-
 	switch subcmd := p.Subcommand().(type) {
 	case *importart.ImportCmd:
 		err = subcmd.Run()
 	case *mail.MailCmd:
 		err = subcmd.Run()
+	case *AccountCmd:
+		err = subcmd.Run(flags)
 	default:
+		// Only the server owns the pidfile. Claiming it for a subcommand would
+		// make every command refuse to run while the server is up, since it
+		// would find the server's own pid there and take it for a duplicate.
+		handle_pidfile(flags.Pidfile)
 		err = root.RunServer(flags)
 	}
 
+	// A command that ran and failed is not a usage mistake, so it reports the
+	// reason on its own. p.Fail is for arguments that could not be parsed, where
+	// the usage line is the useful part.
 	if err != nil {
-		fmt.Println("FEHLER: ", err)
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(2)
 	}
 }
 
-func (flags Flags) cmsConfig() cmsuc.Config {
-	return cmsuc.Config{
-		RepoContent: flags.RepoContent,
-		DataDir:     flags.DataDir,
-		Search:      search.Config{Level: search.ParseLevel(flags.SearchLevel), DataDirPath: flags.DataDir, IndexName: flags.SearchDir},
+func withMngrOptions(flags Flags) func(*mgmt.Config) {
+	return func(conf *mgmt.Config) {
+		conf.DataDir = flags.DataDir
+		conf.RepoClone = false
+		// The search config now carries one path and a mode instead of a
+		// directory plus an index name.
+		conf.Search.IndexPath = filepath.Join(flags.DataDir, flags.SearchDir)
+		conf.Search.IndexMode = flags.SearchIndex
+		conf.Search.Level = search.ParseLevel(flags.SearchLevel)
 	}
 }
 
@@ -129,14 +151,27 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	}
 	defer pg.Close()
 
-	auth.New(flags.JWTIssuer, flags.JWTSecretKey, flags.JWTDuration, flags.CookieName, flags.CookieSameSite, pg, pg)
-
-	cmsapi, err := cmsuc.NewCMSApi(flags.cmsConfig())
+	// Everything host-dependent comes from here, so a bad value fails at startup
+	// rather than surfacing later as a ceremony that will not complete.
+	site, err := newSite(flags)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fapi := familie.NewApi(cmsapi.Repo, cmsapi.Engine)
+	hitokens := hiDriveTokens{hi.NewTokenMngr(pg)}
+
+	authsvc, err := openAuth(context.Background(), pg, site, flags, hitokens)
+	if err != nil {
+		log.Fatal("openAuth: ", err)
+	}
+	go authsvc.StartCleanup(context.Background(), time.Hour)
+
+	cms, err := mgmt.NewContentManager(flags.RepoContent, withMngrOptions(flags))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fapi := familie.NewApi(cms.Repo, cms.Engine)
 
 	var route = api.WithRoute
 
@@ -145,18 +180,28 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		api.Handler("/", spa.Serve(flags.SPAPath)),
 
 		// route(" POST /tokenauth                ", tokenauth), // soll token liefern für spezielle Funktionalität
-		route("      /apihle/auth/authorize    ", flags.authorize),
-		route("      /hi/auth/authcode         ", flags.callback(pg)),
+		// Binding a HiDrive account is an operator action, not something a
+		// visitor can start.
+		route("      /apihle/auth/authorize    ", requireAccount(authsvc, site.authorize(flags))),
+		route("      "+oauthCallbackPath+"     ", requireAccount(authsvc, site.callback(flags, pg))),
 
-		route("      /auth/signin        ", auth.Signin),
-		route("      /auth/login         ", auth.Login),
-		route("      /auth/token         ", auth.TokenAuthHandler),
-		route("      /auth/logout        ", auth.Logout),
-		route("      /auth/session       ", auth.Session),
+		route("      /auth/login         ", authsvc.Login),
+		route("      /auth/logout        ", authsvc.Logout),
+		route("      /auth/session       ", authsvc.Session),
 
-		route("      /api/auth/login         ", auth.Login),
-		route("      /api/auth/logout        ", auth.Logout),
-		route("      /api/auth/session       ", auth.Session),
+		// Passkey ceremonies. Registration is authorised by a session or an
+		// enrollment link, and in either case by the account's password.
+		route(" POST /auth/passkey/login/begin      ", authsvc.LoginBegin),
+		route(" POST /auth/passkey/login/finish     ", authsvc.LoginFinish),
+		route(" POST /auth/passkey/register/begin   ", authsvc.RegisterBegin),
+		route(" POST /auth/passkey/register/finish  ", authsvc.RegisterFinish),
+		route(" DELETE /auth/passkey/{id}           ", authsvc.DeletePasskey),
+		route("  GET /auth/enroll                   ", authsvc.Enroll),
+		route("  GET /auth/passkey                  ", authsvc.Passkeys),
+
+		route("      /api/auth/login         ", authsvc.Login),
+		route("      /api/auth/logout        ", authsvc.Logout),
+		route("      /api/auth/session       ", authsvc.Session),
 
 		route("  GET /hi/meta/{path...}        ", hi.MetaHandlerMux),
 		route("  GET /hi/media/{path...}       ", hi.FileHandlerMux),
@@ -165,57 +210,99 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		// higrp.GET("/tags/*path", hi.TagsHandler)
 		route("  GET /media/videos/{path...}   ", serveContentWithPrefix("videos")), // used for serving local video on opalstack
 
-		route("  GET /api/v1/entries/{path...} ", cmsapi.EntryDetails),
-		route("  PUT /api/v1/entries/{path...} ", cmsapi.EntryUpdate),
+		// Reading content is open: the public site is rendered from it. Where an
+		// account is present it is attached, so the entry's own ACL can decide.
+		route("  GET /api/v1/entries/{path...} ", optionalAccount(authsvc, cmsapi.EntryDetails(cms))),
+		// Writing content requires an account. The entry ACL cannot stand in for
+		// this: every entry is mode-zero, and a zero mode allows everyone.
+		route("  PUT /api/v1/entries/{path...} ", requireAccount(authsvc, cmsapi.EntryUpdate(cms))),
 
-		route("  GET /api/v1/entry             ", cmsuc.EntryLookup(cmsapi.CMS)), // lookup single entry with search params
+		route("  GET /api/v1/entry             ", optionalAccount(authsvc, cmsapi.EntryLookup(cms))), // lookup single entry with search params
 		// route("  GET /api/v1/entries           ", cmsuc.EntriesLookup(cmsapi.CMS)), // lookup entries with search params
 
-		route("  GET  /api/v1/super8/{path...}", super8.ServeHiVideo),
+		// Family video: the account is needed both to allow the request and to
+		// pick which stored HiDrive credential serves it.
+		route("  GET  /api/v1/super8/{path...}", requireAccount(authsvc, super8.ServeHiVideo(hitokens))),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
-		route("  GET  /api/v1/search", cmsuc.SearchEntries(cmsapi.CMS)),
+		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
 	)
 
-	return srvr.ListenAndServe(cmd.Port, nil)
+	log.Printf("serving %s on port %d", site.Origin, cmd.Port)
+
+	return srvr.ListenAndServe(cmd.Port, flags.CorsOrigins, flags.Debug)
 }
 
-func (flags Flags) authorize(w http.ResponseWriter, r *http.Request) error {
+// authorize starts the HiDrive consent flow, which is how a refresh token is
+// obtained for an alias in the first place — the session system authenticates
+// people, this authorises storage access.
+//
+// The redirect_uri is built from the public URL and has to match the
+// registration held by HiDrive exactly, so changing the domain means updating it
+// there too.
+func (site *site) authorize(flags Flags) func(http.ResponseWriter, *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		// state comes back untouched and is where the browser is sent
+		// afterwards, so it is a path on this site and is validated as one.
+		next := r.URL.Query().Get("state")
+		if next == "" {
+			next = "/"
+		}
+		if !isLocalPath(next) {
+			return errs.New("state must be a path on this site", errs.HTTPStatus(http.StatusBadRequest))
+		}
 
-	url := fmt.Sprintf("https://my.hidrive.com/client/authorize?client_id=%s=&response_type=code&scope=admin,rw&state=%s&redirect_uri=http://localhost:8000/hi/auth/authcode", flags.HidriveClientID, r.URL.Query().Get("state"))
-	http.Redirect(w, r, url, http.StatusSeeOther)
-	return nil
+		params := url.Values{
+			"client_id":     {flags.HidriveClientID},
+			"response_type": {"code"},
+			"scope":         {"admin,rw"},
+			"state":         {next},
+			"redirect_uri":  {site.OAuthRedirect},
+		}
+		http.Redirect(w, r, "https://my.hidrive.com/client/authorize?"+params.Encode(), http.StatusSeeOther)
+		return nil
+	}
 }
 
-func (flags Flags) callback(db *db.DB) func(w http.ResponseWriter, r *http.Request) error {
+// isLocalPath keeps a redirect on this site. Without it the state parameter is
+// an open redirect: whatever it holds is where the browser ends up.
+func isLocalPath(p string) bool {
+	return strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "//")
+}
+
+func (site *site) callback(flags Flags, db *db.DB) func(w http.ResponseWriter, r *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 
-		code := r.URL.Query().Get("code")
-		fmt.Println("code:", code, flags.HidriveClientID, flags.HidriveClientSecret)
-
-		token, err := hi.RefreshTokenWithAuthCode(flags.HidriveClientID, flags.HidriveClientSecret, code)
+		token, err := hi.RefreshTokenWithAuthCode(
+			flags.HidriveClientID, flags.HidriveClientSecret, r.URL.Query().Get("code"))
 		if err != nil {
-			http.Error(w, "callback: "+err.Error(), 401)
-			return err
+			return errs.Wrap(err, "exchanging the authorization code", errs.HTTPStatus(http.StatusUnauthorized))
 		}
-		fmt.Println("token:", token)
-		// tokenmap[token.UserID] = *token
-		err = db.StoreToken(token)
-		if err != nil {
+		if err := db.StoreToken(token); err != nil {
 			return err
 		}
 
+		// SameSite=None is only accepted alongside Secure, so over plain http the
+		// pairing has to fall back or the browser discards the cookie outright.
+		sameSite := http.SameSiteNoneMode
+		if !site.CookieSecure {
+			sameSite = http.SameSiteLaxMode
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "hitoken",
 			Value:    token.AccessToken,
 			Path:     "/",
 			MaxAge:   token.ExpiresIn,
 			HttpOnly: true,
-			Secure:   true,
-			SameSite: http.SameSiteNoneMode,
+			Secure:   site.CookieSecure,
+			SameSite: sameSite,
 		})
 
-		http.Redirect(w, r, r.URL.Query().Get("state"), http.StatusSeeOther)
+		next := r.URL.Query().Get("state")
+		if !isLocalPath(next) {
+			next = "/"
+		}
+		http.Redirect(w, r, next, http.StatusSeeOther)
 		return nil
 	}
 }
@@ -363,3 +450,5 @@ func handle_pidfile(filename string) {
 
 // 	srv.Run()
 // }
+
+// auth0

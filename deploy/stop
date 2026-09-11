@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# Stop the app. Succeeds when it is already stopped, so a deploy can call it
+# unconditionally.
+set -uo pipefail
+
+APPDIR="$(cd "$(dirname "$0")" && pwd)"
+APPNAME="$(basename "$APPDIR")"
+PIDFILE="$APPDIR/$APPNAME.pid"
+
+if [ ! -f "$PIDFILE" ]; then
+    echo "$APPNAME not running"
+    exit 0
+fi
+
+PID="$(cat "$PIDFILE")"
+if ! kill -0 "$PID" 2>/dev/null; then
+    echo "$APPNAME not running (stale pidfile)"
+    rm -f "$PIDFILE"
+    exit 0
+fi
+
+# SIGTERM lets the app remove its own pidfile.
+kill "$PID"
+for _ in $(seq 40); do
+    kill -0 "$PID" 2>/dev/null || break
+    sleep 0.25
+done
+
+if kill -0 "$PID" 2>/dev/null; then
+    echo "$APPNAME did not stop, killing $PID" >&2
+    kill -9 "$PID"
+fi
+rm -f "$PIDFILE"
+echo "$APPNAME stopped"

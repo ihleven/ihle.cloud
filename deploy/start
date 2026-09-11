@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+# Start the app.
+#
+# Configuration is read from .env beside the binary — godotenv loads it from the
+# working directory, which is why this cd's first. Keeping settings out of this
+# script means secrets live in one file, and deploying a new script cannot
+# disturb them.
+set -euo pipefail
+
+APPDIR="$(cd "$(dirname "$0")" && pwd)"
+APPNAME="$(basename "$APPDIR")"
+PIDFILE="$APPDIR/$APPNAME.pid"
+LOGDIR="$HOME/logs/apps/$APPNAME"
+
+cd "$APPDIR"
+
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    echo "$APPNAME already running as $(cat "$PIDFILE")"
+    exit 0
+fi
+# A pidfile with no process behind it is left over from a crash.
+rm -f "$PIDFILE"
+
+if [ ! -f "$APPDIR/.env" ]; then
+    echo "no .env in $APPDIR — the app would fall back to development defaults" >&2
+    exit 1
+fi
+
+mkdir -p "$LOGDIR"
+nohup "./$APPNAME" >> "$LOGDIR/console.log" 2>&1 &
+
+# The app writes its own pidfile and removes it on shutdown, so its appearance
+# is the signal that startup got past its configuration checks.
+for _ in $(seq 40); do
+    if [ -f "$PIDFILE" ]; then
+        echo "$APPNAME started as $(cat "$PIDFILE")"
+        exit 0
+    fi
+    sleep 0.25
+done
+
+echo "$APPNAME did not come up; last lines of $LOGDIR/console.log:" >&2
+tail -n 20 "$LOGDIR/console.log" >&2
+exit 1

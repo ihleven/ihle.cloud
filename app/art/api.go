@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
-	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
+	"github.com/interhome-group/cms/mgmt/search"
+	"github.com/interhome-group/cms/pkg/errs"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/gitrepo"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/gorilla/schema"
+	"github.com/interhome-group/cms/mgmt/gitrepo"
 )
 
 func NewApi(repo *gitrepo.Sitory, eng *search.Engine) *api {
@@ -65,7 +65,7 @@ func (a *api) ArtworkHandler(w http.ResponseWriter, r *http.Request) {
 
 	entry, err := a.repo.GetEntry(fmt.Sprintf("artworks/%s.json", r.PathValue("id")))
 	if err != nil {
-		respond(w, r, errors.Code(err), err)
+		respond(w, r, errs.StatusOf(err), err)
 		return
 	}
 

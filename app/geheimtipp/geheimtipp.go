@@ -1,6 +1,6 @@
 package geheimitpp
 
-import "bitbucket.org/hotelplan/webcc-content/cms/content"
+import "github.com/interhome-group/cms/content"
 
 func NewService(repo dbrepo) (*Service, error) {
 
@@ -20,7 +20,7 @@ type dbrepo interface {
 }
 
 type Edition struct {
-	content.ContentType `type:"Edition" json:"-" yaml:"-" mimetype:"text/json"`
+	content.EntryContent `type:"Edition" json:"-" yaml:"-" mimetype:"text/json"`
 
 	Key        string `json:"key"`
 	Geburtstag string `json:"geburtstag"`

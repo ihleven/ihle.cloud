@@ -1,8 +1,19 @@
 export default defineAppConfig({
 
-  // api: {
-  //   baseURL: 'http://localhost:8000',
-  // },
+  // This app's contribution to the CMS entry layer's registries: content type ->
+  // editor component name, and content type -> preview card in the directory
+  // browser. Both are deep-merged with the layer's own, which carries only the
+  // fallback and the directory itself.
+  contentTypes: {
+    Person: 'Person',
+    Work: 'Artwork',
+    Super8: 'Super8',
+  },
+
+  contentTypePanels: {
+    Person: 'PersonPanel',
+    Super8: 'Super8Panel',
+  },
 
   toaster: {
     duration: 5000,

@@ -20,7 +20,7 @@ import (
 // }
 
 func newerr(msg string, args ...interface{}) Error {
-	return Error{Message: fmt.Sprintf(msg, args)}
+	return Error{Message: fmt.Sprintf(msg, args...)}
 }
 
 type Error struct {

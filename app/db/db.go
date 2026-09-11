@@ -31,6 +31,12 @@ func (db *DB) Close() {
 	db.pool.Close()
 }
 
+// Pool exposes the connection pool so other packages can run their own queries
+// against the same database without opening a second pool.
+func (db *DB) Pool() *pgxpool.Pool {
+	return db.pool
+}
+
 // type KunstDB interface {
 // 	// SaveTask(title, description string) error
 // 	GetAusstellungen() ([]Ausstellung, error)

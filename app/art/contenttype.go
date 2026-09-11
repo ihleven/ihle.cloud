@@ -3,16 +3,16 @@ package art
 import (
 	"time"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/content"
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/analysis/lang/de"
 	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/interhome-group/cms/content"
+	"github.com/interhome-group/cms/mgmt/search"
 )
 
 // Complete Works
 type Work struct { // => ARTWORK
-	content.ContentType `type:"Work"  json:"-" mimetype:"application/json"`
+	content.EntryContent `type:"Work"  json:"-" mimetype:"application/json"`
 
 	ID          int `json:"id"` //
 	Dir         string
@@ -124,19 +124,19 @@ func (d Work) BleveMapping() *mapping.DocumentMapping {
 }
 
 type Ausstellung struct { // Exhibition
-	content.ContentType `type:"Ausstellung"  json:"-" mimetype:"application/json"`
-	ID                  int        `json:"id"`
-	Code                string     `json:"code"`
-	Ort                 string     `json:"ort"`
-	Jahr                int        `json:"jahr"`
-	Venue               string     `json:"venue"`
-	Titel               string     `json:"titel"`
-	Untertitel          string     `json:"untertitel"`
-	Typ                 string     `json:"typ"`
-	Von                 *time.Time `json:"von"`
-	Bis                 *time.Time `json:"bis"`
-	Kommentar           string     `json:"kommentar"`
-	Fotos               []string   `json:"fotos"`
+	content.EntryContent `type:"Ausstellung"  json:"-" mimetype:"application/json"`
+	ID                   int        `json:"id"`
+	Code                 string     `json:"code"`
+	Ort                  string     `json:"ort"`
+	Jahr                 int        `json:"jahr"`
+	Venue                string     `json:"venue"`
+	Titel                string     `json:"titel"`
+	Untertitel           string     `json:"untertitel"`
+	Typ                  string     `json:"typ"`
+	Von                  *time.Time `json:"von"`
+	Bis                  *time.Time `json:"bis"`
+	Kommentar            string     `json:"kommentar"`
+	Fotos                []string   `json:"fotos"`
 }
 
 func (d *Ausstellung) Clone() interface{} {

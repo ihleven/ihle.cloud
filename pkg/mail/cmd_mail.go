@@ -5,7 +5,7 @@ import (
 	"net/smtp"
 	"net/url"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
+	"github.com/interhome-group/cms/pkg/errs"
 )
 
 type MailCmd struct {
@@ -34,7 +34,7 @@ func (cmd *MailCmd) Run() error {
 func smtpauth(urlconf string) (smtp.Auth, error) {
 	url, err := url.Parse(urlconf)
 	if err != nil {
-		return nil, errors.New("invalid mail auth config: %s", urlconf)
+		return nil, errs.New("invalid mail auth config: %s", urlconf)
 	}
 	switch url.Scheme {
 	case "plain":
@@ -42,5 +42,5 @@ func smtpauth(urlconf string) (smtp.Auth, error) {
 		auth := smtp.PlainAuth("", url.User.Username(), pwd, url.Host)
 		return auth, nil
 	}
-	return nil, errors.New("unsupported mail auth scheme: %s", url.Scheme)
+	return nil, errs.New("unsupported mail auth scheme: %s", url.Scheme)
 }

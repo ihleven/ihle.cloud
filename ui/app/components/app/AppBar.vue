@@ -92,7 +92,7 @@
           <li class="ml-auto pl-4">
             <a
               class="flex items-center space-x-2 p-2 hover:bg-muted"
-              href="http://localhost:8000/apihle/auth/authorize?state=http://localhost:3000/"
+              href="/apihle/auth/authorize?state=/"
             >
               <UIcon
                 name="i-lucide-log-in"

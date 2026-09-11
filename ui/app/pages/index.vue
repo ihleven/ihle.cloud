@@ -2,7 +2,7 @@
   <main class="grid w-screen grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] content-start">
     <div class="w-full bg-lime-300 text-ral-7035">
       INDEX
-      <a href="http://localhost:8000/apihle/auth/authorize?state=http://localhost:3000/">AUTHORIZE</a>
+      <a href="/apihle/auth/authorize?state=/">AUTHORIZE</a>
 
       <NuxtLink to="/cmsasdf">asdf</NuxtLink>
     </div>

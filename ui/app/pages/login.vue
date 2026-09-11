@@ -40,14 +40,56 @@
         </UFieldGroup>
       </UFormField>
     </form>
+
+    <!-- Usernameless: the authenticator says which credential it holds, so
+         there is nothing to type. Shown even where it cannot be used, with the
+         reason, because a button that vanishes explains nothing. -->
+    <div class="ml-4 flex flex-col items-start gap-1">
+      <UButton
+        color="warning"
+        variant="subtle"
+        :loading="busy"
+        :disabled="!!reason"
+        :ui="{ base: 'rounded' }"
+        @click="signInWithPasskey"
+      >
+        Use a device
+      </UButton>
+      <p v-if="reason" class="max-w-48 text-xs text-amber-900">{{ reason }}</p>
+    </div>
   </article>
 </template>
 
 <script setup>
-const { loginajax } = await useAuth()
+const { loginajax, loadSession } = await useAuth()
+const passkey = usePasskey()
 const { query } = useRoute()
 const error = ref(null)
 const form = ref(null)
+const busy = ref(false)
+const reason = ref('')
+
+// Evaluated after mount: it depends on browser globals, so it cannot be decided
+// while the template is first being set up.
+onMounted(() => {
+  reason.value = passkey.unavailable()
+})
+
+async function signInWithPasskey() {
+  busy.value = true
+  error.value = null
+  try {
+    await passkey.signIn()
+    await loadSession()
+    navigateTo(query.redirect || '/')
+  }
+  catch (e) {
+    error.value = passkey.describe(e)
+  }
+  finally {
+    busy.value = false
+  }
+}
 // const actionurl = `http://localhost:8000/auth/login?redirect=${query.redirect}`
 async function submit() {
   // try {

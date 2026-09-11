@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
-	"bitbucket.org/hotelplan/webcc-content/cms/pkg/errors"
+	"github.com/interhome-group/cms/mgmt/search"
+	"github.com/interhome-group/cms/pkg/errs"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/gitrepo"
+	"github.com/interhome-group/cms/mgmt/gitrepo"
 )
 
 func NewApi(repo *gitrepo.Sitory, eng *search.Engine) *api {
@@ -48,7 +48,7 @@ func Adapt(f func(w http.ResponseWriter, r *http.Request) error) http.HandlerFun
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := f(w, r)
 		if err != nil {
-			status := errors.Code(err)
+			status := errs.StatusOf(err)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(status)
 			enc := json.NewEncoder(w)
@@ -68,7 +68,7 @@ type ErrorHandlerFunc func(http.ResponseWriter, *http.Request) error
 func (f ErrorHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := f(w, r)
 	if err != nil {
-		status := errors.Code(err)
+		status := errs.StatusOf(err)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(status)
 		enc := json.NewEncoder(w)

@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/content"
-	"bitbucket.org/hotelplan/webcc-content/cms/mgmt/search"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/mapping"
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
+	"github.com/interhome-group/cms/content"
+	"github.com/interhome-group/cms/mgmt/search"
 )
 
 type Reise struct {
-	content.ContentType `type:"Reise" json:"-" yaml:"-" mimetype:"text/markdown"`
+	content.EntryContent `type:"Reise" json:"-" yaml:"-" mimetype:"text/markdown"`
 
 	Ziel string    `json:"ziel"`
 	Jahr int       `json:"jahr"`
@@ -37,7 +37,7 @@ func (p *Reise) MarshalMarkdown(meta content.Meta) ([]byte, error) {
 	return []byte(fmt.Sprintf("---\n%s---\n%s\n", matterbytes, p.Content)), nil
 }
 
-func (p *Reise) UnmarshalMarkdown(data []byte, matter *content.Frontmatter) error {
+func (p *Reise) UnmarshalMarkdown(data []byte, matter *Frontmatter) error {
 
 	if t, ok := matter.Content["von"].(string); ok {
 		// p.Geburtstag, _ = time.Parse(time.RFC3339, t)

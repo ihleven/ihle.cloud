@@ -9,7 +9,7 @@ import (
 	"github.com/ihleven/ihlvn/app/art"
 	"github.com/ihleven/ihlvn/app/art/importart/db"
 
-	"bitbucket.org/hotelplan/webcc-content/cms/content"
+	"github.com/interhome-group/cms/content"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
