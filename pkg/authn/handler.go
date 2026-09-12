@@ -21,8 +21,12 @@ type sessionResponse struct {
 	NotBefore   int64               `json:"nbf"`
 	IssuedAt    int64               `json:"iat"`
 	Permissions map[string]struct{} `json:"permissions"`
-	Name        string              `json:"name"`
-	Email       string              `json:"email"`
+	// Modules are the feature areas the frontend may offer. Computed here at
+	// serve time, so the client never has to know that an entitlement is really
+	// a module.<id> permission.
+	Modules []string `json:"modules"`
+	Name    string   `json:"name"`
+	Email   string   `json:"email"`
 }
 
 func (s *Service) sessionResponse(a *Account, expires time.Time) sessionResponse {
@@ -39,6 +43,7 @@ func (s *Service) sessionResponse(a *Account, expires time.Time) sessionResponse
 		NotBefore:   now.Unix(),
 		IssuedAt:    now.Unix(),
 		Permissions: permissions,
+		Modules:     a.EntitledModules(),
 		Name:        a.DisplayName,
 		Email:       a.Email,
 	}
@@ -72,7 +77,6 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.setSessionCookie(w, token)
-	s.setHiDriveCookie(w, r, account)
 	s.log.Info("signed in", "account", account.Name)
 
 	return writeJSON(w, s.sessionResponse(account, time.Now().Add(s.cfg.SessionTTL)))
@@ -112,14 +116,12 @@ func (s *Service) authenticatePassword(r *http.Request, name, password string) (
 	return account, nil
 }
 
-// Session reports who is signed in. The frontend polls it, and it is also where
-// the browser is handed a fresh HiDrive access token.
+// Session reports who is signed in. The frontend polls it.
 func (s *Service) Session(w http.ResponseWriter, r *http.Request) error {
 	account, expires, ok := s.authenticate(r)
 	if !ok {
 		return errStatus(http.StatusUnauthorized, "not signed in")
 	}
-	s.setHiDriveCookie(w, r, account)
 	return writeJSON(w, s.sessionResponse(account, expires))
 }
 
@@ -132,41 +134,7 @@ func (s *Service) Logout(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 	s.clearCookie(w, s.cfg.CookieName)
-	s.clearCookie(w, hiDriveCookie)
 	return writeJSON(w, map[string]bool{"ok": true})
-}
-
-const hiDriveCookie = "hitoken"
-
-// setHiDriveCookie hands the browser the access token for the account's HiDrive
-// alias, which is what the media routes present upstream. A failure clears the
-// cookie rather than leaving a stale token in place.
-func (s *Service) setHiDriveCookie(w http.ResponseWriter, r *http.Request, a *Account) {
-	if s.tokens == nil || a.HiDrive.Alias == "" {
-		return
-	}
-	token, err := s.tokens.AccessToken(a.HiDrive.Alias)
-	if err != nil {
-		s.log.Warn("no HiDrive token for alias", "alias", a.HiDrive.Alias, "err", err)
-		s.clearCookie(w, hiDriveCookie)
-		return
-	}
-	// The media routes may be fetched cross-site by the player, which needs
-	// SameSite=None — but a browser only accepts None together with Secure, so
-	// over plain HTTP the cookie falls back to Lax. Same-origin playback, which
-	// is what development is, works either way.
-	sameSite, secure := http.SameSiteNoneMode, true
-	if !s.cfg.CookieSecure {
-		sameSite, secure = http.SameSiteLaxMode, false
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     hiDriveCookie,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: sameSite,
-	})
 }
 
 // clientAddr is the throttling key for "the same caller". Behind a proxy this

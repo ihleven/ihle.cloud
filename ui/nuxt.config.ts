@@ -31,6 +31,29 @@ export default defineNuxtConfig({
   ],
 
   devtools: { enabled: true },
+
+  // Added to the home screen on an iPhone, the app opens without Safari's
+  // address bar and toolbar. This is a manifest and a few meta tags and nothing
+  // else — deliberately no service worker: iOS does not need one for standalone
+  // mode, and a precaching worker is what makes a deployed update arrive late.
+  app: {
+    head: {
+      link: [
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
+      meta: [
+        // The modern name, and the one iOS has always read.
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-title', content: 'ihleven' },
+        // "default" keeps the status bar its own strip rather than putting the
+        // page under it, so no safe-area handling is needed.
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+        { name: 'theme-color', content: '#ffffff' },
+      ],
+    },
+  },
   // ssr: false,
   // app: {
   //   rootAttrs: { class: 'h-full' },

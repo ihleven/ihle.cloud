@@ -1,8 +1,8 @@
 package hi
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"net/url"
@@ -16,14 +16,18 @@ import (
 // 	Stat(name string) (os.FileInfo, error)
 // }
 
+// NewFS adapts a HiDrive account to fs.FS for a caller that already holds an
+// access token. It reads from the account root; confinement is Drive's job, so
+// this is for tools, not for serving a browsing user.
 func NewFS(accesstoken string) hifsys {
-	return hifsys{client: hdclient{"/", accesstoken}}
+	return hifsys{client: Client{}, token: accesstoken}
 }
 
 // DRIVE implementiert fs.FS
 // custom functionality on top of hidrive client like custom permissions
 type hifsys struct {
-	client hdclient
+	client Client
+	token  string
 	// token string
 	// read_perms []string
 	// write_perm []string
@@ -35,23 +39,22 @@ type hifsys struct {
 
 // Open implements fs.FS interface
 func (fs *hifsys) Open(name string) (fs.File, error) {
-	meta, err := fs.client.GetMeta("/" + name)
+	meta, err := fs.client.Meta(context.Background(), fs.token, "/"+name)
 	if err != nil {
 		return nil, err
 	}
 
 	file := File{meta: meta, fsys: *fs}
 	// meta.accessToken = fs.client.token
-	fmt.Println("OPen", name, file)
 
 	return &file, nil
 }
 func (fs *hifsys) Stat(name string) (fs.FileInfo, error) {
-	return fs.client.GetMeta(name)
+	return fs.client.Meta(context.Background(), fs.token, name)
 }
 
 func (fsys *hifsys) ReadDir(name string) ([]fs.DirEntry, error) {
-	meta, err := fsys.client.GetDir(name)
+	meta, err := fsys.client.Dir(context.Background(), fsys.token, name)
 	if err != nil {
 		return nil, err
 	}
@@ -88,13 +91,11 @@ type File struct {
 
 func (f *File) Stat() (fs.FileInfo, error) {
 	// var info fs.FileInfo = f.meta
-	fmt.Println("f.Stat()", f.meta)
 	return f.meta, nil
 }
 
 func (f *File) Read(p []byte) (int, error) {
 
-	fmt.Println("read:", f.meta.Path, len(p))
 	if f.readIndex >= int64(f.meta.Size_) {
 		return 0, io.EOF
 	}
@@ -103,7 +104,7 @@ func (f *File) Read(p []byte) (int, error) {
 
 	path, _ := url.QueryUnescape(f.meta.Path)
 
-	body, er := f.fsys.client.GetFile(path, int(f.readIndex), int(f.readIndex)+len(p)-1)
+	body, er := f.fsys.client.File(context.Background(), f.fsys.token, path, f.readIndex, int64(len(p)))
 	if er != nil {
 		return 0, io.EOF
 	}
@@ -124,14 +125,12 @@ func (f *File) Read(p []byte) (int, error) {
 }
 
 func (f *File) Close() error {
-	fmt.Println("close:", f.meta.Path)
 	f.meta = nil
 	f.readIndex = 0
 	return nil
 }
 
 func (f *File) Seek(offset int64, whence int) (int64, error) {
-	fmt.Println("seek", f.meta.Path, offset, whence)
 	var abs int64
 	switch whence {
 	case io.SeekStart:

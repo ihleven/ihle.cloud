@@ -26,7 +26,7 @@ func testService(t *testing.T) (*Service, *Store, context.Context) {
 		Audience:   "famihlie",
 		SessionTTL: time.Hour,
 		SlideAfter: time.Minute,
-	}, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestLoginThrottlesRepeatedFailures(t *testing.T) {
 	svc, err := New(store, Config{
 		CookieName: "session", SessionTTL: time.Hour, SlideAfter: time.Minute,
 		FailureLimit: 3, FailureWindow: time.Minute,
-	}, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -416,7 +416,7 @@ func TestCookieSecureFollowsConfig(t *testing.T) {
 		svc, err := New(store, Config{
 			CookieName: "session", CookieSecure: secure,
 			SessionTTL: time.Hour, SlideAfter: time.Minute,
-		}, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+		}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		if err != nil {
 			t.Fatalf("New: %v", err)
 		}

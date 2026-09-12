@@ -6,6 +6,9 @@ type Session = {
   nbf: number
   iat: number
   permissions: Record<string, object>
+  // The feature areas this account may see, derived by the server from its
+  // permissions. See useModules.
+  modules: string[]
   name: string
   email: string
   expiry?: Date

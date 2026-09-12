@@ -65,27 +65,19 @@ type Config struct {
 	CeremonyCookie string
 }
 
-// TokenSource yields a HiDrive access token for an alias. The session endpoint
-// hands one to the browser so the media routes can use it; authn only needs to
-// be able to ask.
-type TokenSource interface {
-	AccessToken(alias string) (string, error)
-}
-
 // Service is the use-case and HTTP half. Store is the persistence half; nothing
 // here writes SQL.
 type Service struct {
 	store    *Store
 	cfg      Config
 	log      *slog.Logger
-	tokens   TokenSource
 	throttle *throttle
 	// wa is nil when RPID is unset: passkeys are optional, passwords are not.
 	wa *webauthn.WebAuthn
 }
 
 // New builds the service, filling in defaults for anything the caller left zero.
-func New(store *Store, cfg Config, log *slog.Logger, tokens TokenSource) (*Service, error) {
+func New(store *Store, cfg Config, log *slog.Logger) (*Service, error) {
 	if store == nil {
 		return nil, errors.New("authn: a store is required")
 	}
@@ -129,7 +121,6 @@ func New(store *Store, cfg Config, log *slog.Logger, tokens TokenSource) (*Servi
 		store:    store,
 		cfg:      cfg,
 		log:      log,
-		tokens:   tokens,
 		throttle: newThrottle(cfg.FailureLimit, cfg.FailureWindow),
 	}
 

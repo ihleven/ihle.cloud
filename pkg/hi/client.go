@@ -1,133 +1,106 @@
 package hi
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"path"
-	"strings"
+	"strconv"
 	"time"
 )
 
-type Config struct {
-	ClientID     string `arg:"env:CLIENT_ID"      help:"Hidrive client ID"`
-	ClientSecret string `arg:"env:CLIENT_SECRET"  help:"Hidrive client secret"`
+// DefaultBaseURL is HiDrive's REST API.
+const DefaultBaseURL = "https://api.hidrive.strato.com/2.1"
+
+// Client consumes the HiDrive API: one method per endpoint, taking an access
+// token and the parameters the endpoint documents.
+//
+// It holds no credential and no account. A token is a per-call argument because
+// one lives about an hour — a client that captured one at construction would
+// outlive it, which is how a long-lived handler ends up authenticating with an
+// expired token. Whose drive is being read is likewise not its business; that is
+// Drive's.
+type Client struct {
+	// HTTP is the client used for requests. The zero value is a client with a
+	// generous timeout, which suits large files.
+	HTTP *http.Client
+	// BaseURL is the API root. Empty means DefaultBaseURL; a test points it at
+	// a stub.
+	BaseURL string
 }
 
-var client = http.Client{
-	Timeout: 100 * time.Second,
-}
-
-func NewClient(token, prefix string) *hdclient {
-
-	return &hdclient{
-		token:  token,
-		prefix: path.Clean(prefix),
+func (c *Client) httpClient() *http.Client {
+	if c.HTTP != nil {
+		return c.HTTP
 	}
+
+	return &http.Client{Timeout: 100 * time.Second}
 }
 
-// hdclient
-type hdclient struct {
-	prefix string
-	token  string
-}
-
-type Meta struct {
-	ID             string `json:"id,omitempty"`
-	NameURLEncoded string `json:"name"`
-	Path           string `json:"path,omitempty"`
-	Type_          string `json:"type,omitempty"`
-	Size_          int    `json:"size,omitempty"`
-	Category       string `json:"category,omitempty"`
-	NMembers       int    `json:"nmembers,omitempty"`
-	MTime          int64  `json:"mtime,omitempty"`
-	Members        []Meta `json:"members,omitempty"`
-	Mimetype       string `json:"mime_type,omitempty"`
-
-	CTime    int    `json:"ctime,omitempty"`
-	Readable bool   `json:"readable,omitempty"`
-	Writable bool   `json:"writable,omitempty"`
-	ParentID string `json:"parent_id,omitempty"`
-
-	Image *Image `json:"image,omitempty"`
-}
-type Image struct {
-	Width  int   `json:"width"`
-	Height int   `json:"height"`
-	Exif   *Exif `json:"exif"`
-}
-
-type Exif struct {
-	DateTimeOriginal string  `json:",omitempty"`
-	Make             string  `json:",omitempty"`
-	Model            string  `json:",omitempty"`
-	ImageWidth       int     `json:",omitempty"`
-	ImageHeight      int     `json:",omitempty"`
-	ExifImageWidth   int     `json:",omitempty"`
-	ExifImageHeight  int     `json:",omitempty"`
-	Aperture         float64 `json:",omitempty"`
-	ExposureTime     float64 `json:",omitempty"`
-	ISO              int     `json:",omitempty"`
-	FocalLength      float64 `json:",omitempty"`
-	Orientation      int     `json:",omitempty"`
-	XResolution      float64 `json:",omitempty"`
-	YResolution      float64 `json:",omitempty"`
-	ResolutionUnit   int     `json:",omitempty"`
-	BitsPerSample    int     `json:",omitempty"`
-	GPSLatitude      float64 `json:",omitempty"`
-	GPSLongitude     float64 `json:",omitempty"`
-	GPSAltitude      float64 `json:",omitempty"`
-}
-
-func (hd *hdclient) resolvepath(p string) string {
-	if hd.prefix != "" {
-		p = path.Join(hd.prefix, p)
+func (c *Client) baseURL() string {
+	if c.BaseURL != "" {
+		return c.BaseURL
 	}
-	return path.Clean(p)
+
+	return DefaultBaseURL
 }
 
-// GetMeta liefert die Dateien für Pfad p relativ zum client prefix
-func (hd *hdclient) GetMeta(p string) (*Meta, error) {
-	resolved := hd.resolvepath(p)
-	fmt.Println(" GetMeta * resolved path:", p, resolved)
+// do issues a request against one endpoint, authenticated with token.
+func (c *Client) do(ctx context.Context, endpoint, token string, params url.Values, options ...func(*http.Request)) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL()+endpoint+"?"+params.Encode(), nil)
+	if err != nil {
+		return nil, Error{HTTPStatus: http.StatusInternalServerError, Message: "Couldn't create request: " + err.Error()}
+	}
 
-	fields := "id,name,path,category,nmembers,ctime,has_dirs,mtime,readable,size,type,writable,mime_type,members,members.id,members.name,image.exif,image.height,image.width"
-	params := url.Values{
-		"path":   []string{p},
+	request.Header.Set("Authorization", "Bearer "+token)
+
+	for _, apply := range options {
+		apply(request)
+	}
+
+	resp, err := c.httpClient().Do(request)
+	if err != nil {
+		return nil, Error{HTTPStatus: http.StatusBadGateway, Message: "requesting " + endpoint + ": " + err.Error()}
+	}
+
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		defer io.Copy(io.Discard, resp.Body)
+
+		apiErr := Error{HTTPStatus: resp.StatusCode}
+		if err := json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
+			return nil, Error{HTTPStatus: resp.StatusCode, Message: "HiDrive refused the request and its reason was unreadable"}
+		}
+
+		return nil, apiErr
+	}
+
+	return resp, nil
+}
+
+// metaFields and dirFields are the "need to know" field lists the API asks for:
+// requesting everything costs response time.
+const (
+	metaFields = "id,name,path,category,nmembers,ctime,has_dirs,mtime,readable,size,type,writable,mime_type,members,members.id,members.name,image.exif,image.height,image.width"
+	dirFields  = "id,name,path,category,nmembers,chash,ctime,mtime,has_dirs,readable,rshare,size,type,writable,members,members.category,members.chash,members.ctime,members.has_dirs,members.image.exif,members.image.height,members.image.width,members.mime_type,members.name,members.nmembers,members.size,members.type,mhash,mohash,nhash,parent_id"
+)
+
+// Meta describes one filesystem object.
+func (c *Client) Meta(ctx context.Context, token, path string) (*Meta, error) {
+	return c.meta(ctx, "/meta", token, path, metaFields)
+}
+
+// Dir describes a directory and its members.
+func (c *Client) Dir(ctx context.Context, token, path string) (*Meta, error) {
+	return c.meta(ctx, "/dir", token, path, dirFields)
+}
+
+func (c *Client) meta(ctx context.Context, endpoint, token, path, fields string) (*Meta, error) {
+	resp, err := c.do(ctx, endpoint, token, url.Values{
+		"path":   []string{path},
 		"fields": []string{fields},
-	}
-	resp, err := rq(GET, "/meta", params, bearer(hd.token))
-	fmt.Println(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	defer io.Copy(io.Discard, resp.Body)
-
-	var meta Meta
-	err = json.NewDecoder(resp.Body).Decode(&meta)
-	if err != nil {
-		return nil, Error{Message: err.Error()}
-	}
-	meta.Path = strings.TrimPrefix(meta.Path, hd.prefix)
-	return &meta, nil
-}
-
-func (hd *hdclient) GetDir(p string) (*Meta, error) {
-	p = hd.resolvepath(p)
-
-	fmt.Println(" GetDir * resolved path:", p)
-
-	params := url.Values{
-		"path":   []string{p},
-		"fields": []string{"id,name,path,category,nmembers,chash,ctime,mtime,has_dirs,readable,rshare,size,type,writable,members,members.category,members.chash,members.ctime,members.has_dirs,members.image.exif,members.image.height,members.image.width,members.mime_type,members.name,members.nmembers,members.size,members.type,mhash,mohash,nhash,parent_id"},
-	}
-	resp, err := rq(GET, "/dir", params, bearer(hd.token))
-	fmt.Println(resp, params)
-
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -135,44 +108,37 @@ func (hd *hdclient) GetDir(p string) (*Meta, error) {
 	defer io.Copy(io.Discard, resp.Body)
 
 	var meta Meta
-	err = json.NewDecoder(resp.Body).Decode(&meta)
-	if err != nil {
-		return nil, Error{Message: err.Error()}
+	if err := json.NewDecoder(resp.Body).Decode(&meta); err != nil {
+		return nil, Error{Message: "could not read the " + endpoint + " response: " + err.Error()}
 	}
-	meta.Path = strings.TrimPrefix(meta.Path, hd.prefix)
+
 	return &meta, nil
 }
 
-func (hd *hdclient) GetURL(p string) (*url.URL, error) {
-
-	respath := hd.resolvepath(p)
-
-	fmt.Println("GETURL", respath)
-
-	resp, err := rq(GET, "/file/url", url.Values{"path": []string{respath}}, bearer(hd.token))
+// URL returns a pre-signed URL for a file. It carries no credential, so it can
+// be handed to a browser — which also means it is shareable until it expires.
+func (c *Client) URL(ctx context.Context, token, path string) (*url.URL, error) {
+	resp, err := c.do(ctx, "/file/url", token, url.Values{"path": []string{path}})
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	defer io.Copy(io.Discard, resp.Body)
 
 	var response struct {
 		URL string `json:"url"`
 	}
-
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		return nil, err
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, Error{Message: "could not read the file/url response: " + err.Error()}
 	}
 
 	return url.Parse(response.URL)
 }
 
-func (hd *hdclient) GetFile(p string, rangeFrom, rangeTo int) (io.ReadCloser, error) {
-	respath := hd.resolvepath(p)
-	resp, err := rq(GET, "/file", url.Values{"path": []string{respath}},
-		bearer(hd.token),
-		rangeHeader(rangeFrom, rangeTo),
-	)
+// File reads a file. off and n select a byte range; n <= 0 reads to the end.
+// The caller closes the reader.
+func (c *Client) File(ctx context.Context, token, path string, off, n int64) (io.ReadCloser, error) {
+	resp, err := c.do(ctx, "/file", token, url.Values{"path": []string{path}}, byteRange(off, n))
 	if err != nil {
 		return nil, err
 	}
@@ -180,16 +146,23 @@ func (hd *hdclient) GetFile(p string, rangeFrom, rangeTo int) (io.ReadCloser, er
 	return resp.Body, nil
 }
 
-func (hd *hdclient) File(p string, query url.Values, h http.Header) (*http.Response, error) {
-	query.Set("path", "/"+hd.resolvepath(p))
+// Thumbnail reads a scaled preview of an image. The caller closes the reader.
+func (c *Client) Thumbnail(ctx context.Context, token string, params url.Values) (*http.Response, error) {
+	return c.do(ctx, "/file/thumbnail", token, params)
+}
 
-	resp, err := rq(GET, "/file", query,
-		bearer(hd.token),
-		headers(h),
-	)
-	if err != nil {
-		return nil, err
+// byteRange asks for part of a file, in the inclusive form HTTP uses.
+func byteRange(off, n int64) func(*http.Request) {
+	return func(req *http.Request) {
+		if off <= 0 && n <= 0 {
+			return
+		}
+
+		spec := "bytes=" + strconv.FormatInt(off, 10) + "-"
+		if n > 0 {
+			spec += strconv.FormatInt(off+n-1, 10)
+		}
+
+		req.Header.Set("Range", spec)
 	}
-
-	return resp, nil
 }

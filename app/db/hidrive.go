@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ihleven/ihlvn/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/hiauth"
 )
 
 type HiToken struct {
@@ -57,7 +57,7 @@ func (db *DB) LoadTokens() ([]map[string]string, error) {
 	return result, nil
 }
 
-func (db *DB) StoreToken(token *hi.Token) error {
+func (db *DB) StoreToken(token *hiauth.Token) error {
 	sql := `
 		UPDATE hitoken
            SET scope=$2,refresh_token=$3,expires_at=$4

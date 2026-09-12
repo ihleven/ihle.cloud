@@ -113,7 +113,6 @@ func (s *Service) LoginFinish(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.setSessionCookie(w, token)
-	s.setHiDriveCookie(w, r, account.account)
 	s.log.Info("signed in with a passkey", "account", account.account.Name)
 
 	return writeJSON(w, s.sessionResponse(account.account, time.Now().Add(s.cfg.SessionTTL)))

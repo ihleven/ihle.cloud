@@ -68,3 +68,17 @@ func write(t *testing.T, path, body string) {
 		t.Fatalf("writing %s: %v", path, err)
 	}
 }
+
+// A manifest served as text/plain is the difference between an installed app
+// with a name and icon and one without; Go's own table does not cover it.
+func TestWebmanifestContentType(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "manifest.webmanifest"), `{"name":"x"}`)
+
+	rec := httptest.NewRecorder()
+	Serve(dir).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/manifest.webmanifest", nil))
+
+	if got := rec.Header().Get("Content-Type"); got != "application/manifest+json" {
+		t.Errorf("Content-Type = %q, want application/manifest+json", got)
+	}
+}

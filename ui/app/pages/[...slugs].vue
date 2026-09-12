@@ -44,7 +44,7 @@ if (error.value) {
 }
 
 const componentmap: Record<string, object | string> = {
-  Super8: resolveComponent('PageSuper8'),
+  Film: resolveComponent('PageFilm'),
   Ausstellung: resolveComponent('PageExhibition'),
   Person: resolveComponent('PagePerson'),
   Default: resolveComponent('PageExhibition'),

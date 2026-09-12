@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,7 +18,9 @@ import (
 	"github.com/ihleven/ihlvn/app/art/importart"
 	"github.com/ihleven/ihlvn/app/cmsapi"
 	"github.com/ihleven/ihlvn/app/db"
-	"github.com/ihleven/ihlvn/app/super8"
+	"github.com/ihleven/ihlvn/app/films"
+	"github.com/ihleven/ihlvn/app/media"
+	"github.com/ihleven/ihlvn/pkg/blob"
 	"github.com/ihleven/ihlvn/pkg/cmd"
 	"github.com/ihleven/ihlvn/pkg/mail"
 	"github.com/ihleven/ihlvn/pkg/spa"
@@ -33,6 +36,7 @@ import (
 	"github.com/ihleven/ihlvn/app/familie"
 	"github.com/ihleven/ihlvn/pkg/api"
 	"github.com/ihleven/ihlvn/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/hiauth"
 
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -48,10 +52,17 @@ type Flags struct {
 	HidriveClientID     string `arg:"--hidrive-client-id,     env:CLIENT_ID"        placeholder:"ID"`
 	HidriveClientSecret string `arg:"--hidrive-client-secret, env:CLIENT_SECRET"    placeholder:"SECRET"`
 	RepoContent         string `arg:"                         env:REPO_CONTENT"     placeholder:"URL" `
-	DataDir             string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
-	SearchLevel         string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
-	SearchDir           string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
-	SearchIndex         string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
+
+	// The HiDrive account media is delivered from. Delivery is not per-viewer:
+	// a film lives in one place, and the same entry has to resolve to the same
+	// bytes for everyone — including, for public media, for nobody at all.
+	// Browsing is the other case, and takes its drive from the session.
+	MediaAlias  string `arg:"--media-alias, env:MEDIA_ALIAS" placeholder:"ALIAS" help:"HiDrive alias media is delivered from. Unset disables the media route"`
+	MediaRoot   string `arg:"--media-root,  env:MEDIA_ROOT"  placeholder:"PATH"  help:"directory media keys resolve against. Nothing outside it can be addressed"`
+	DataDir     string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
+	SearchLevel string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
+	SearchDir   string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
+	SearchIndex string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
 
 	JWTIssuer      string        `arg:"--jwt-issuer,env:JWT_ISSUER"                         default:"ihle.cloud" placeholder:"ISSUER"`
 	JWTSecretKey   string        `arg:"--jwt-secret,env:JWT_SECRET_KEY"                                          placeholder:"KEY"`
@@ -76,6 +87,7 @@ type RootCmd struct {
 	*importart.ImportCmd `arg:"subcommand:import"`
 	*mail.MailCmd        `arg:"subcommand:mail"`
 	*AccountCmd          `arg:"subcommand:account"`
+	*HiTokenCmd          `arg:"subcommand:hitoken"`
 
 	// root cmd flags
 	Port  int  `arg:"-p,--port,env:PORT" default:"8000"   help:"Port numbe"` // default:"10815"
@@ -91,7 +103,7 @@ func main() {
 	// set cmd.Info
 	cmd.SetLdflags(BUILD_DIR, BUILD_TIME, BUILD_OUTPUT, GIT_DESCRIPTION)
 
-	content.Register(super8.Super8{})
+	content.Register(films.Film{})
 	// yaml.RegisterCustomUnmarshaler[content.Entry](content.UnmarshalYAMLEntry)
 	content.Register(familie.Person{})
 	content.Register(familie.Reise{})
@@ -113,6 +125,8 @@ func main() {
 	case *mail.MailCmd:
 		err = subcmd.Run()
 	case *AccountCmd:
+		err = subcmd.Run(flags)
+	case *HiTokenCmd:
 		err = subcmd.Run(flags)
 	default:
 		// Only the server owns the pidfile. Claiming it for a subcommand would
@@ -158,9 +172,21 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		log.Fatal(err)
 	}
 
-	hitokens := hiDriveTokens{hi.NewTokenMngr(pg)}
+	hitokens := hiDriveTokens{hiauth.NewTokenMngr(pg)}
 
-	authsvc, err := openAuth(context.Background(), pg, site, flags, hitokens)
+	// The drive media is delivered from. Stat results are cached because every
+	// ranged request needs the object's size and validators before it can
+	// answer, and each of those is a round-trip to HiDrive otherwise.
+	var (
+		filmstore  blob.Blobstore
+		filmthumbs films.Thumbnailer
+	)
+	if flags.MediaAlias != "" {
+		drive := hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.MediaRoot}, nil)
+		filmstore, filmthumbs = blob.NewStatCache(drive.Blobs(), 0), drive
+	}
+
+	authsvc, err := openAuth(context.Background(), pg, site, flags)
 	if err != nil {
 		log.Fatal("openAuth: ", err)
 	}
@@ -203,10 +229,6 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("      /api/auth/logout        ", authsvc.Logout),
 		route("      /api/auth/session       ", authsvc.Session),
 
-		route("  GET /hi/meta/{path...}        ", hi.MetaHandlerMux),
-		route("  GET /hi/media/{path...}       ", hi.FileHandlerMux),
-		route("  GET /hi/media/thumbs          ", hi.ThumbHandlerMux),
-		route("  GET /hi/media/proxy/{path...} ", hi.ServeReverseProxyMux),
 		// higrp.GET("/tags/*path", hi.TagsHandler)
 		route("  GET /media/videos/{path...}   ", serveContentWithPrefix("videos")), // used for serving local video on opalstack
 
@@ -220,9 +242,19 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET /api/v1/entry             ", optionalAccount(authsvc, cmsapi.EntryLookup(cms))), // lookup single entry with search params
 		// route("  GET /api/v1/entries           ", cmsuc.EntriesLookup(cmsapi.CMS)), // lookup entries with search params
 
-		// Family video: the account is needed both to allow the request and to
-		// pick which stored HiDrive credential serves it.
-		route("  GET  /api/v1/super8/{path...}", requireAccount(authsvc, super8.ServeHiVideo(hitokens))),
+		// Two ways to reach a file, distinguished by how it is addressed.
+		//
+		// A film is addressed by its entry id, and the storage key is read off
+		// the entry — so nothing about where the bytes live reaches the
+		// browser, and the film is one resource with sub-resources. The id is a
+		// single segment, which is what lets "/poster.jpg" hang off it.
+		route("  GET  /api/v1/films/{id}", requireAccount(authsvc, films.Handler(cms, filmstore, slog.Default()))),
+		route("  GET  /api/v1/films/{id}/poster.jpg", requireAccount(authsvc, films.Poster(cms, filmthumbs))),
+		route("  GET  /api/v1/films/{id}/chapters.vtt", requireAccount(authsvc, films.ChapterTrack(cms))),
+
+		// An asset is addressed by its path in the viewer's own drive, which is
+		// the browsing case rather than the delivery one.
+		route("  GET  /api/v1/proxy/{path...}", requireAccount(authsvc, media.Proxy(hitokens))),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
@@ -273,7 +305,7 @@ func isLocalPath(p string) bool {
 func (site *site) callback(flags Flags, db *db.DB) func(w http.ResponseWriter, r *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 
-		token, err := hi.RefreshTokenWithAuthCode(
+		token, err := hiauth.RefreshTokenWithAuthCode(
 			flags.HidriveClientID, flags.HidriveClientSecret, r.URL.Query().Get("code"))
 		if err != nil {
 			return errs.Wrap(err, "exchanging the authorization code", errs.HTTPStatus(http.StatusUnauthorized))

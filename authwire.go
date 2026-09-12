@@ -9,7 +9,7 @@ import (
 
 	"github.com/ihleven/ihlvn/app/db"
 	"github.com/ihleven/ihlvn/pkg/authn"
-	"github.com/ihleven/ihlvn/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/hiauth"
 	"github.com/interhome-group/cms/pkg/errs"
 )
 
@@ -17,7 +17,7 @@ import (
 //
 // Migrations run here rather than as a separate deployment step, so the binary
 // and the schema it expects cannot get out of step.
-func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags, tokens authn.TokenSource) (*authn.Service, error) {
+func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags) (*authn.Service, error) {
 	if err := authn.Migrate(ctx, pg.Pool()); err != nil {
 		return nil, fmt.Errorf("migrating the account database: %w", err)
 	}
@@ -36,13 +36,13 @@ func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags, tokens au
 		RPOrigins: site.PasskeyOrigins,
 		// RPDisplayName is left to authn, which falls back to the relying party
 		// id — so the name a browser shows follows the domain automatically.
-	}, slog.Default(), tokens)
+	}, slog.Default())
 }
 
-// hiDriveTokens adapts the HiDrive token manager to what authn asks for: given
-// an account's alias, the access token to hand the browser.
+// hiDriveTokens adapts the HiDrive token manager to what a handler asks for:
+// given an account's alias, an access token to use upstream.
 type hiDriveTokens struct {
-	mngr *hi.TokenMngr
+	mngr *hiauth.TokenMngr
 }
 
 func (h hiDriveTokens) AccessToken(alias string) (string, error) {

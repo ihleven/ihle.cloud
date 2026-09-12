@@ -2,9 +2,17 @@ package spa
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"strings"
 )
+
+// Go's table has no entry for .webmanifest, so a web app manifest would go out
+// as text/plain. Safari tolerates that; Chrome warns and a stricter client may
+// refuse it, which would silently cost an installed app its name and icon.
+func init() {
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 /////////////////////////////////////////////////////
 

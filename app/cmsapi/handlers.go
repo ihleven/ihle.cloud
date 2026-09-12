@@ -28,16 +28,8 @@ import (
 )
 
 // contentUser is the user the CMS evaluates for a request.
-//
-// An unauthenticated request is the anonymous user rather than a bypass: entry
-// ACLs are still applied to it, and it is granted whatever an entry grants to
-// others. That is what lets the public site read content without the write path
-// being open to everyone.
 func contentUser(r *http.Request) content.User {
-	if account, ok := authn.FromContext(r.Context()); ok {
-		return account.ContentUser()
-	}
-	return content.Anonymous()
+	return authn.ContextUser(r.Context())
 }
 
 // EntryDetails returns a single entry by storage path.

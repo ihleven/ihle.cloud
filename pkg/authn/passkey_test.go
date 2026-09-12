@@ -28,7 +28,7 @@ func passkeyService(t *testing.T) (*Service, context.Context) {
 		SlideAfter: time.Minute,
 		RPID:       "localhost",
 		RPOrigins:  []string{"http://localhost:8000"},
-	}, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

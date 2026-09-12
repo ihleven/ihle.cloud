@@ -1,7 +1,10 @@
 package authn
 
 import (
+	"context"
+
 	"github.com/interhome-group/cms/content"
+	"github.com/interhome-group/cms/modules"
 )
 
 // ContentUser maps an account onto the identity the CMS evaluates.
@@ -17,6 +20,13 @@ func (a *Account) ContentUser() content.User {
 	return content.NewUser(a.Name,
 		content.Signature{Name: a.DisplayName, Email: a.Email},
 		a.CMS.Groups, a.CMS.Permissions)
+}
+
+// EntitledModules returns the feature areas this account may see, derived from
+// its scope rather than stored on it. An account granting nothing is entitled to
+// nothing, which is what keeps the anonymous account out of every area.
+func (a *Account) EntitledModules() []string {
+	return modules.Entitled(a.ContentUser().Scope)
 }
 
 // UnregisteredPermissions returns the account's permission strings that no
@@ -45,4 +55,17 @@ func (a *Account) UnregisteredPermissions() []string {
 		}
 	}
 	return unknown
+}
+
+// ContextUser is the identity the CMS evaluates a request against.
+//
+// A request without an account is the anonymous user rather than a refusal:
+// entry ACLs are applied to it too, and it is granted whatever an entry grants
+// to others. That is what lets the public site read content without the write
+// path being open.
+func ContextUser(ctx context.Context) content.User {
+	if account, ok := FromContext(ctx); ok {
+		return account.ContentUser()
+	}
+	return content.Anonymous()
 }

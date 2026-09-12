@@ -7,12 +7,12 @@ export default defineAppConfig({
   contentTypes: {
     Person: 'Person',
     Work: 'Artwork',
-    Super8: 'Super8',
+    Film: 'Film',
   },
 
   contentTypePanels: {
     Person: 'PersonPanel',
-    Super8: 'Super8Panel',
+    Film: 'FilmPanel',
   },
 
   toaster: {
