@@ -1,54 +1,44 @@
 <template>
-  <div>
-    <h1 class="text-xl font-semibold">Ausgaben</h1>
+  <main class="min-h-screen grow bg-gray-100">
+    <h1 class="p-2 text-lg underline decoration-sky-300 decoration-dashed decoration-4 underline-offset-4">
+      Geheimtipp
+    </h1>
 
-    <p v-if="pending" class="mt-4 text-sm text-gray-500">Wird geladen …</p>
+    <section class="bg-white/30 pt-8">
+      <h3 class="px-4 py-1 font-semibold text-sky-300">aktuelle Spieltage</h3>
 
-    <UAlert
-      v-else-if="error"
-      class="mt-4" color="error" variant="soft"
-      title="Die Tipprunde ist gerade nicht erreichbar"
-      :description="String(error)"
-    />
+      <div v-if="rows.length" class="border-y border-gray-300">
+        <GhtSpieltagRow
+          v-for="row in rows" :key="row.label"
+          :label="row.label"
+          :round="row.round"
+          :season="edition"
+        />
+      </div>
 
-    <ul v-else class="mt-4 divide-y divide-gray-200 border-y border-gray-200">
-      <li v-for="ausgabe in ausgaben" :key="ausgabe.id" class="flex items-baseline gap-4 py-3">
-        <span class="w-16 shrink-0 font-mono text-sm text-gray-500">{{ ausgabe.code }}</span>
-        <span class="grow">{{ ausgabe.name }}</span>
-        <UBadge v-if="ausgabe.aktuell" variant="subtle" size="sm">aktuell</UBadge>
-        <span class="w-24 text-right text-sm text-gray-500">
-          {{ ausgabe.numTipper }} Tipper
-        </span>
-      </li>
-    </ul>
-  </div>
+      <p v-else class="px-4 py-2 text-sm text-gray-500">
+        Für diese Ausgabe sind gerade keine Spieltage angesetzt.
+      </p>
+    </section>
+  </main>
 </template>
 
 <script setup lang="ts">
-// Reachable without signing in: the pool is public and always has been, and the
-// family app's sign-in overlay would otherwise cover it. This is also why it is
-// not an area — an entitlement would refuse a signed-in family member a page
-// that strangers can read.
+// Public to this app: the pool's own gate is the layer's middleware, and the
+// family app's sign-in overlay has no business covering this.
 definePageMeta({ public: true, layout: 'geheimtipp' })
 
-type Ausgabe = {
-  id: number
-  code: string
-  name: string
-  season: number
-  aktuell: boolean
-  numTipper: number
-}
+// Already loaded by the gate — /aktuell is both the session probe and this
+// page's content, which is why it is one request and not two.
+const { aktuell, edition } = useGhtSession()
 
-// The pool's own backend, reached through this app's proxy. The base is runtime
-// config so that serving both from one origin later changes a value rather than
-// this file.
-const base = useRuntimeConfig().public.geheimtippBase as string
-
-const { data: ausgaben, pending, error } = await useFetch<Ausgabe[]>('/ausgaben', {
-  baseURL: base,
-  // The pool keeps its own session in a cookie of its own; sending it costs
-  // nothing here and is what the tipping pages will need.
-  credentials: 'include',
+const rows = computed(() => {
+  const s = aktuell.value?.spieltage
+  if (!s) return []
+  return [
+    { label: 'Letzter Spieltag', round: s.last },
+    { label: 'Aktueller Spieltag', round: s.current },
+    { label: 'Nächster Spieltag', round: s.next },
+  ].filter(r => r.round).map(r => ({ ...r, round: r.round!, season: edition.value }))
 })
 </script>

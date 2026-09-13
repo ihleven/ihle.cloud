@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="200">
+<defs id="defs4">
+<pattern id="p1" x="0" y="0" width="42.4" height="42.4" patternUnits="userSpaceOnUse">
+<path d="M0,0h42.4v42.4h-42.4z" fill="#fff"/>
+<g fill="#f00">
+<circle cx="21.2" cy="0" r="7.4"/>
+<circle cx="21.2" cy="42.4" r="7.4"/>
+<circle cx="0" cy="21.2" r="7.4"/>
+<circle cx="42.4" cy="21.2" r="7.4"/>
+</g>
+</pattern>
+  </defs>
+<path style="fill:url(#p1);stroke:#000;stroke-width:3" d="m10,47 15,40 40-25 10,125h100l10-125 40,25 15-40-50-35H162a64,64 0 0,1-74,0H60z"/>
+</svg>

@@ -222,6 +222,11 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+	ghtLogin, err := geheimtipp.Login(flags.GeheimtippAPI, site.CookieSecure, "/ght")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ghtLogout := geheimtipp.Logout(site.CookieSecure, "/ght")
 
 	// The enrollment link's lifetime matches the CLI's default: long enough to
 	// hand over, short enough that a link left in a chat log stops working.
@@ -288,10 +293,16 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
 
 		// The geheimtipp pool's own backend, under this origin so a browser may
-		// reach it. Ungated: what it forwards to is public, and so are the pages
-		// that use it. See app/geheimtipp for why this exists and when it goes.
-		route("      /ght/media/{path...}  ", ghtMedia),
-		route("      /ght/{path...}        ", ghtAPI),
+		// reach it. Not gated on an account here: the pool has its own sign-in
+		// against its own users, and this app's identity has no standing there.
+		// See app/geheimtipp for why this exists and when it goes.
+		//
+		// Sign-in is ours rather than the proxy's because the upstream returns
+		// the token in the body and leaves the cookie to its caller.
+		route(" POST /ght/login           ", ghtLogin),
+		route(" POST /ght/logout          ", ghtLogout),
+		route("      /ght/media/{path...} ", ghtMedia),
+		route("      /ght/{path...}       ", ghtAPI),
 
 		// Account administration. Everything here is gated on the admin
 		// entitlement rather than on being signed in: these endpoints can grant

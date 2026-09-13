@@ -1,0 +1,83 @@
+/* The pool's own classes — what its tailwind.css holds and Tailwind does not.
+ *
+ * Prefixed `ght-` so it is plain at a glance that these are not utilities, and
+ * so the lint rule that checks every class against Tailwind can be told about
+ * them by shape rather than one by one.
+ */
+
+/* White, outlined in black on all four sides, so a number reads against a
+ * photograph or a yellow jersey. Used on the matchday jersey, the match splash
+ * and the all-tips list — one definition, because the pool has one. */
+.ght-outline {
+  color: #fff;
+  font-weight: 600;
+  text-shadow:
+    -0.5px -0.5px 0 #000,
+    0.5px -0.5px 0 #000,
+    -0.5px 0.5px 0 #000,
+    0.5px 0.5px 0 #000;
+}
+
+/* The match splash: the two teams either side of the result, over a photograph,
+ * with the matchday arrows pinned to the edges. Named areas, which Tailwind has
+ * no utility for. */
+.ght-splash {
+  display: grid;
+  background: url('/assets/geheimtipp/splash.jpg') 50% 40% / cover;
+  grid-template-columns: 64px 1fr 50px 1fr 64px;
+  grid-template-areas:
+    'previous match  match  match next'
+    'previous intro  intro  intro next'
+    'hteam    hteam  sep    ateam ateam';
+  justify-items: stretch;
+  align-items: center;
+}
+
+/* The tip stepper: two columns of up/down arrows around the result field. */
+.ght-tipp-grid {
+  display: grid;
+  grid-template-columns: 1fr 8rem 2rem 2rem 8rem 1fr;
+  grid-template-rows: auto 3rem 1rem 1rem 3rem auto;
+  grid-template-areas:
+    '.    title  title  title  title  .'
+    'left hu     hu     gu     gu     right'
+    'left hu     hu     gu     gu     right'
+    '.    hd     hd     gd     gd     right'
+    '.    hd     hd     gd     gd     right'
+    '.    submit submit submit submit .';
+  justify-items: stretch;
+  align-items: stretch;
+}
+
+/* One row per tipper on a match: avatar, name, the tip, the points. */
+.ght-tipp-rows {
+  display: grid;
+  grid-template-columns: 68px minmax(100px, 1fr) minmax(80px, 1fr) 100px minmax(0, 1fr);
+  justify-content: center;
+}
+
+/* The tip itself, in the pool's purple. Not a Tailwind colour. */
+.ght-chip {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  background: #38003c;
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.6rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* The pool's menu panels: dark, see-through, blurred over whatever they cover.
+ * Applied to a Nuxt UI popover's content, which is otherwise the app's own
+ * light surface — the two menus sit on a photograph and on a near-black bar,
+ * and a white card on either reads as a different site. */
+.ght-panel {
+  background: rgb(0 0 0 / 0.6);
+  backdrop-filter: blur(8px);
+  border: 0;
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.3),
+    0 0 0 1px rgb(0 0 0 / 0.05);
+}

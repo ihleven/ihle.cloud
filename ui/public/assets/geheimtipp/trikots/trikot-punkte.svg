@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://web.resource.org/cc/"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://inkscape.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="250"
+   height="200"
+   id="svg2"
+   sodipodi:version="0.32"
+   inkscape:version="0.43"
+   version="1.0"
+   sodipodi:docbase="/home/tijmen-gentoo/Images/Graphics Tijmen/SVG/Sweaters"
+   sodipodi:docname="Jersey redballs.svg">
+  <defs
+     id="defs4">
+    <pattern
+       inkscape:collect="always"
+       xlink:href="#pattern3068"
+       id="pattern3947"
+       patternTransform="matrix(0.707107,0.707107,-0.707107,0.707107,-40,-92)" />
+    <pattern
+       patternUnits="userSpaceOnUse"
+       width="30"
+       height="30"
+       id="pattern3068">
+      <rect
+         y="0"
+         x="0"
+         height="30"
+         width="30"
+         id="rect1305"
+         style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke-width:2.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <path
+         transform="matrix(0.75012,0,0,0.75012,95.04805,-58.67066)"
+         d="M -91.668793 103.33121 A 10 10 0 1 1  -111.66879,103.33121 A 10 10 0 1 1  -91.668793 103.33121 z"
+         sodipodi:ry="10"
+         sodipodi:rx="10"
+         sodipodi:cy="103.33121"
+         sodipodi:cx="-101.66879"
+         id="path1310"
+         style="opacity:1;fill:#ff0000;fill-opacity:1;fill-rule:evenodd;stroke-width:2.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         sodipodi:type="arc" />
+    </pattern>
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.979899"
+     inkscape:cx="0.14286464"
+     inkscape:cy="137.86868"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="true"
+     inkscape:grid-bbox="true"
+     inkscape:grid-points="true"
+     gridspacingx="5px"
+     gridspacingy="5px"
+     gridtolerance="2px"
+     inkscape:window-width="1273"
+     inkscape:window-height="947"
+     inkscape:window-x="0"
+     inkscape:window-y="0" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       style="fill:url(#pattern3947);fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:2.50000072;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="M 10.000006,47.362195 L 25.000014,87.362204 L 65.000023,62.3622 L 75.000027,187.36223 L 175.00006,187.36223 L 185.00006,62.3622 L 225.00007,87.362204 L 240.00008,47.362195 L 190.00006,12.362181 L 162.50005,12.362184 C 138.03377,27.840049 112.50004,27.362189 87.500031,12.362184 L 60.000022,12.362183 L 10.000006,47.362195 z "
+       id="path1307"
+       sodipodi:nodetypes="ccccccccccccc" />
+  </g>
+</svg>

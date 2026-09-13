@@ -9,6 +9,24 @@ This file starts here; anything before the entries below is only in the git hist
 
 ### Added
 
+- **The football pool is served from here**: Geheimtipp — the tipping pool that has lived at ihleven.de — is now rendered by this app: the current matchdays, a matchday's tip matrix with every tipper side by side, the day's and the overall standings, the league table, the list of matchdays, and the ranking with everyone's avatar and motto. The tips themselves still live in the pool's own database; only the pages are new.
+
+- **Tips can be placed again**: on a matchday, your own column is typeable until each match kicks off — every other column stays as it is, and a match whose kick-off has passed stops taking anything. One *Abschicken* sends the whole matchday at once, and the pool answers per match, so tips it takes are kept even when one of them comes too late. A single match can also be tipped on its own page, with the same up-and-down buttons the pool has always had.
+
+- **Results are entered in the app**: on a matchday, whoever keeps the pool's results gets a field per fixture instead of the printed score, and one button saves the lot — which rescores everyone, so the standings and the league table beside it are re-read with it. Fixtures not yet played keep their placeholder rather than being cleared. Nobody else is offered the fields, and the pool refuses the save from anyone else regardless.
+
+- **A page for each match**: the two clubs over a photograph with the result between them, arrows to the match before and after, and underneath it every tipper's tip with the points it earned, best first.
+
+- **Registering for the edition**: name, motto and a picture — chosen from the pool's collection or uploaded. Signing in and being registered are two different things, and trying to tip without the second now says so and offers the way to fix it, instead of being refused by the server without explanation.
+
+- **A changed name, motto or picture shows up straight away**: previously the registration page saved, and the ranking and the matchday headings went on showing the old one until the page was reloaded — the same thing happened on the old site. A tipper is described in two places at once, and only one of them was being re-read.
+
+- **The avatar page shows tiles or a list**, whichever is wanted: the tiles for picking a picture out, the list for reading what a picture actually is — who it belongs to, its size, format and when it arrived. The old site had only the list.
+
+- **Two menus, one per thing they belong to**: the header over the grass carries the account — who is signed in, and the way out — and stays the same on every page of the pool whatever edition is being read. The bar below carries the edition: its pages, its name, and the registration this person plays it under, with their picture, name, motto and the way to change them. Signing out is offered once, where the account is, rather than in both.
+
+- **The pool has its own sign-in**: whoever tips signs in with their Geheimtipp account, not with the one for the family site. The two live at the same address and have nothing else in common: an account here grants nothing there, and the other way round. Someone signed in sees their own column first — on a phone it is the only one shown, because nobody can read twelve columns of scores on a phone anyway.
+
 - **A new account can be set up without a terminal**: creating one, giving it a first password and handing over an invitation link are all in the app now. Registering a device still asks for that password, as it always has — the link says who, the password proves it is them, and the two are meant to reach the person by different routes.
 
 - **Accounts can be administered from the app**: who may sign in, what each person gets to see, and what they sign in with — all of it now in a "Konten" section instead of only at a terminal on the machine holding the database. An account is created, given its areas, and handed an invitation link; it can be locked without being deleted, signed out everywhere, or have a lost device removed. The section only appears for an account that has been given it, and the server refuses the same requests it hides, so the two cannot disagree. Setting up the very first administrator is still a command-line job, as is any situation where the app itself is what is broken.

@@ -52,11 +52,7 @@ func Proxy(upstream string, prefix string) (func(http.ResponseWriter, *http.Requ
 			r.Out.URL.Path = singleJoin(target.Path, strings.TrimPrefix(r.In.URL.Path, prefix))
 		},
 		ModifyResponse: func(resp *http.Response) error {
-			// A cookie set for the upstream's domain would be dropped by the
-			// browser, which sees this response as coming from us. Without the
-			// attribute it binds to whichever host we are served from, which is
-			// what makes signing in work from here at all.
-			stripCookieDomain(resp.Header)
+			scopeCookies(resp.Header, prefix)
 			return nil
 		},
 	}
@@ -67,9 +63,19 @@ func Proxy(upstream string, prefix string) (func(http.ResponseWriter, *http.Requ
 	}, nil
 }
 
-// stripCookieDomain removes the Domain attribute from every Set-Cookie, leaving
-// the rest of each cookie untouched.
-func stripCookieDomain(h http.Header) {
+// scopeCookies rewrites every Set-Cookie to belong to this mount point and to
+// this host.
+//
+// Domain goes because a cookie set for the upstream's domain would be dropped by
+// the browser, which sees this response as coming from us; without the attribute
+// it binds to whichever host we are served from, which is what makes signing in
+// work from here at all.
+//
+// Path is forced to the mount point because the upstream sets its session cookie
+// for "/" — correct on its own site, wrong here, where "/" is the family app.
+// The two sites share an origin and nothing else, and an unscoped credential is
+// where that would blur first.
+func scopeCookies(h http.Header, prefix string) {
 	cookies := h.Values("Set-Cookie")
 	if len(cookies) == 0 {
 		return
@@ -80,12 +86,13 @@ func stripCookieDomain(h http.Header) {
 		parts := strings.Split(cookie, ";")
 		kept := parts[:0]
 		for _, part := range parts {
-			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(part)), "domain=") {
+			switch attr := strings.ToLower(strings.TrimSpace(part)); {
+			case strings.HasPrefix(attr, "domain="), strings.HasPrefix(attr, "path="):
 				continue
 			}
 			kept = append(kept, part)
 		}
-		rewritten = append(rewritten, strings.Join(kept, ";"))
+		rewritten = append(rewritten, strings.Join(kept, ";")+"; Path="+prefix)
 	}
 	h.Del("Set-Cookie")
 	for _, cookie := range rewritten {

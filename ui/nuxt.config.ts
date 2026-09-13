@@ -12,8 +12,8 @@ export default defineNuxtConfig({
   // A relative path while the layer is still moving, mirroring how go.mod
   // already depends on the same checkout. Switching to a git reference later is
   // a one-line change.
-  // The geheimtipp pool, which is a public site with its own backend rather
-  // than an area of this app — see ui/layers/geheimtipp.
+  // The geheimtipp pool, which is a separate site with its own backend and its
+  // own sign-in rather than an area of this app — see ui/layers/geheimtipp.
   extends: ['../../cms/ui/layers/entry', './layers/geheimtipp'],
 
   modules: [
@@ -101,6 +101,13 @@ export default defineNuxtConfig({
       // across it. Configuration rather than a constant, so moving to the same
       // origin as the pool later is this one value, not a rewrite.
       geheimtippBase: '/ght',
+
+      // Who keeps the pool's results. Entering a match result is the one thing
+      // the pool offers to a single person, and its own frontend writes that
+      // login into a component. Stated here instead: which account runs a
+      // deployment is a property of the deployment. The backend decides whether
+      // to accept the write either way — this only decides whether to offer it.
+      geheimtippAdmin: 'matt',
     },
   },
 
@@ -116,6 +123,10 @@ export default defineNuxtConfig({
       '/hi': { target: devAPI + '/hi', changeOrigin: true },
       '/media': { target: devAPI + '/media', changeOrigin: true },
       '/apihle': { target: devAPI + '/apihle', changeOrigin: true },
+      // The pool's backend, which the Go server proxies onward. Without this the
+      // dev server's catch-all answers /ght/* with the SPA shell — HTML where a
+      // page expects JSON, which surfaces as a fetch failure rather than a 404.
+      '/ght': { target: devAPI + '/ght', changeOrigin: true },
     },
   },
 
