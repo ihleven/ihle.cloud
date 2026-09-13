@@ -9,6 +9,10 @@ This file starts here; anything before the entries below is only in the git hist
 
 ### Added
 
+- **Accounts can be administered from the app**: who may sign in, what each person gets to see, and what they sign in with — all of it now in a "Konten" section instead of only at a terminal on the machine holding the database. An account is created, given its areas, and handed an invitation link; it can be locked without being deleted, signed out everywhere, or have a lost device removed. The section only appears for an account that has been given it, and the server refuses the same requests it hides, so the two cannot disagree. Setting up the very first administrator is still a command-line job, as is any situation where the app itself is what is broken.
+
+- **An invitation link is now enough to join**: whoever opens one chooses their own password as they register their device, instead of needing a password an administrator had already set. Previously a new account was stuck — it could not be given a passkey without a password, and the only way to set one was at a terminal. Nothing has to be conveyed to the new person except the link, and an account that already has a password still has to give it.
+
 - **The family films are a kind of content in their own right**: a film is now described the way a film actually is — which format it was shot on, when and where and by whom, how long it runs, a description, and a still to represent it. It replaces a description built around one particular storage path, so the archive can hold an 8mm reel or a video tape later without anything being redesigned.
 
 - **Films are divided into named scenes**: a reel is a series of runs of the camera, and each one can now be given a name, a starting point and a description. The player offers them as chapters, using the browser's own chapter support rather than a hand-built imitation of it, so jumping to "Bescherung" works the way chapters work everywhere else. Only the starting point has to be given: a scene runs until the next one begins.

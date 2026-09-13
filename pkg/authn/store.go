@@ -119,7 +119,30 @@ func (s *Store) AccountByHandle(ctx context.Context, handle []byte) (*Account, e
 	return s.account(ctx, `a.handle = $1`, handle)
 }
 
+// DisabledAccountByName loads an account whether or not it is disabled.
+//
+// Every other lookup refuses a disabled account, which is what makes disabling
+// take effect everywhere at once. Administration is the one caller that must see
+// through that: a disabled account appears in a listing, and something has to be
+// able to load it in order to turn it back on.
+func (s *Store) DisabledAccountByName(ctx context.Context, name string) (*Account, error) {
+	return s.load(ctx, `a.name = $1`, name)
+}
+
 func (s *Store) account(ctx context.Context, where string, arg any) (*Account, error) {
+	a, err := s.load(ctx, where, arg)
+	if err != nil {
+		return nil, err
+	}
+	// A disabled account must not be usable anywhere, so it is refused here
+	// rather than at each call site. Every live session dies with it.
+	if a.Disabled {
+		return nil, ErrNoAccount
+	}
+	return a, nil
+}
+
+func (s *Store) load(ctx context.Context, where string, arg any) (*Account, error) {
 	row := s.pool.QueryRow(ctx, `select`+accountColumns+`
 		from account a left join cmsauth c on c.account_id = a.id
 		where `+where, arg)
@@ -130,11 +153,6 @@ func (s *Store) account(ctx context.Context, where string, arg any) (*Account, e
 	}
 	if err != nil {
 		return nil, fmt.Errorf("authn: loading account: %w", err)
-	}
-	// A disabled account must not be usable anywhere, so it is refused here
-	// rather than at each call site. Every live session dies with it.
-	if a.Disabled {
-		return nil, ErrNoAccount
 	}
 	return a, nil
 }
@@ -196,6 +214,24 @@ func (s *Store) SetDisabled(ctx context.Context, name string, disabled bool) (in
 		return 0, fmt.Errorf("authn: setting disabled on %s: %w", name, err)
 	}
 	return id, nil
+}
+
+// SetIdentity changes how an account is described: the name shown and the
+// address a commit is signed with.
+//
+// The login name is deliberately not settable. It is what entries are owned by
+// (ContentUser uses it as the id), so renaming an account would silently detach
+// it from everything it has written.
+func (s *Store) SetIdentity(ctx context.Context, id int64, displayName, email string) error {
+	tag, err := s.pool.Exec(ctx,
+		`update account set display_name = $2, email = $3 where id = $1`, id, displayName, email)
+	if err != nil {
+		return fmt.Errorf("authn: setting identity for account %d: %w", id, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNoAccount
+	}
+	return nil
 }
 
 // SetPasswordHash stores an already-hashed password. Hashing is password.go's

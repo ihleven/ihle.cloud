@@ -21,3 +21,12 @@ func init() {
 	modules.Define("musik", "Die Musik.")
 	modules.Define("search", "Die Suche.")
 }
+
+// permAdmin gates account administration.
+//
+// It is the same module.<id> permission as any other area, so one grant both
+// entitles the navigation and admits the API — and "*" satisfies it without
+// being named, because a scope expands the wildcard to every registered
+// permission when it is built. Held as a key because, unlike the other areas,
+// this one is enforced on the server and not only offered in the menu.
+var permAdmin = modules.Define("admin", "Konten und Rechte.")

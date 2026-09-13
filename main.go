@@ -15,11 +15,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ihleven/ihlvn/app/accounts"
 	"github.com/ihleven/ihlvn/app/art/importart"
 	"github.com/ihleven/ihlvn/app/cmsapi"
 	"github.com/ihleven/ihlvn/app/db"
 	"github.com/ihleven/ihlvn/app/films"
 	"github.com/ihleven/ihlvn/app/media"
+	"github.com/ihleven/ihlvn/pkg/authn"
 	"github.com/ihleven/ihlvn/pkg/blob"
 	"github.com/ihleven/ihlvn/pkg/cmd"
 	"github.com/ihleven/ihlvn/pkg/mail"
@@ -199,6 +201,10 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 
 	fapi := familie.NewApi(cms.Repo, cms.Engine)
 
+	// The enrollment link's lifetime matches the CLI's default: long enough to
+	// hand over, short enough that a link left in a chat log stops working.
+	admin := accounts.New(authn.NewStore(pg.Pool()), site.Origin, 15*time.Minute)
+
 	var route = api.WithRoute
 
 	srvr := api.New(
@@ -223,6 +229,7 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route(" POST /auth/passkey/register/finish  ", authsvc.RegisterFinish),
 		route(" DELETE /auth/passkey/{id}           ", authsvc.DeletePasskey),
 		route("  GET /auth/enroll                   ", authsvc.Enroll),
+		route("  GET /auth/enroll/state             ", authsvc.EnrollState),
 		route("  GET /auth/passkey                  ", authsvc.Passkeys),
 
 		route("      /api/auth/login         ", authsvc.Login),
@@ -258,6 +265,22 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
+
+		// Account administration. Everything here is gated on the admin
+		// entitlement rather than on being signed in: these endpoints can grant
+		// rights and set passwords, so hiding the section in the navigation —
+		// which is presentation — is not the protection.
+		route("     GET /api/v1/admin/modules                       ", requireAdmin(authsvc, admin.Areas)),
+		route("     GET /api/v1/admin/accounts                      ", requireAdmin(authsvc, admin.List)),
+		route("    POST /api/v1/admin/accounts                      ", requireAdmin(authsvc, admin.Create)),
+		route("     GET /api/v1/admin/accounts/{name}               ", requireAdmin(authsvc, admin.Get)),
+		route("     PUT /api/v1/admin/accounts/{name}               ", requireAdmin(authsvc, admin.Update)),
+		route("    POST /api/v1/admin/accounts/{name}/password      ", requireAdmin(authsvc, admin.SetPassword)),
+		route("    POST /api/v1/admin/accounts/{name}/enroll        ", requireAdmin(authsvc, admin.Enroll)),
+		route("     GET /api/v1/admin/accounts/{name}/passkeys      ", requireAdmin(authsvc, admin.Passkeys)),
+		route("  DELETE /api/v1/admin/accounts/{name}/passkeys/{id} ", requireAdmin(authsvc, admin.DeletePasskey)),
+		route("  DELETE /api/v1/admin/accounts/{name}/passkeys      ", requireAdmin(authsvc, admin.Revoke)),
+		route("  DELETE /api/v1/admin/accounts/{name}/sessions      ", requireAdmin(authsvc, admin.DeleteSessions)),
 	)
 
 	log.Printf("serving %s on port %d", site.Origin, cmd.Port)

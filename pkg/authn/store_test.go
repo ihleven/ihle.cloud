@@ -41,6 +41,7 @@ func testStore(t *testing.T) (*Store, context.Context) {
 	if err := Migrate(ctx, pool); err != nil {
 		t.Fatalf("migrating: %v", err)
 	}
+	holdTheDatabase(t, pool)
 	if _, err := pool.Exec(ctx, `truncate account restart identity cascade`); err != nil {
 		t.Fatalf("truncating: %v", err)
 	}
@@ -576,4 +577,36 @@ func TestDeletingAccountCascades(t *testing.T) {
 			t.Errorf("%s still has %d rows after the account was deleted", table, n)
 		}
 	}
+}
+
+// dbLockKey serialises the test binaries that truncate this database. Every
+// package that does so takes the same lock; app/accounts holds the other copy of
+// this constant.
+const dbLockKey = 1974
+
+// holdTheDatabase takes the truncation lock for the duration of the test.
+//
+// Under `go test ./...` the package binaries run at the same time, and each of
+// these tests begins by truncating. Without a lock one package wipes another's
+// fixtures mid-test, which surfaces as an unrelated test failing to find an
+// account it had just created. The lock lives in Postgres, so it coordinates
+// across processes without the build having to know anything about it.
+func holdTheDatabase(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
+	ctx := context.Background()
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquiring a connection for the lock: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `select pg_advisory_lock($1)`, dbLockKey); err != nil {
+		conn.Release()
+		t.Fatalf("taking the lock: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := conn.Exec(context.Background(), `select pg_advisory_unlock($1)`, dbLockKey); err != nil {
+			t.Errorf("releasing the lock: %v", err)
+		}
+		conn.Release()
+	})
 }

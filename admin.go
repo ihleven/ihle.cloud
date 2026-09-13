@@ -10,7 +10,6 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
-	"unicode/utf8"
 
 	"golang.org/x/term"
 
@@ -194,23 +193,6 @@ func setPassword(ctx context.Context, store *authn.Store, args []string) error {
 	return nil
 }
 
-// The password policy is advice, not enforcement: no composition rules, no
-// rotation, no reuse check, because those push people towards predictable
-// passwords rather than away from them — and the two checks that remain say so
-// and then let the operator decide.
-//
-// minPasswordLength is where a warning starts, not a rule. Length is a weak
-// signal anyway: a twelve-character password that has leaked is worse than a
-// short one nobody has ever used, which is what the breach screening is for.
-//
-// maxPasswordLength is the one hard bound, and it is a technical one — it keeps
-// a pathological input from being submitted. It is well above anything someone
-// types.
-const (
-	minPasswordLength = 12
-	maxPasswordLength = 64
-)
-
 // readPasswordTwice reads without echoing and confirms, so a typo does not lock
 // someone out of an account they cannot reset themselves.
 func readPasswordTwice() (string, error) {
@@ -239,8 +221,8 @@ func readPasswordTwice() (string, error) {
 	// emoji pass as "32", which is not what a length means to the person typing.
 	// Only the ceiling is refused here; being short is a warning, raised with the
 	// other advice once the password is known to be what was intended.
-	if utf8.RuneCount(first) > maxPasswordLength {
-		return "", fmt.Errorf("use at most %d characters", maxPasswordLength)
+	if authn.TooLong(string(first)) {
+		return "", fmt.Errorf("use at most %d characters", authn.MaxPasswordLength)
 	}
 	return string(first), nil
 }
@@ -254,36 +236,18 @@ func readPasswordTwice() (string, error) {
 // while leaving no way to override it. A screening failure — no network, service
 // down — is reported and blocks nothing, or setting a password would depend on
 // being online.
+//
+// What counts as weak is authn's to decide, so that the terminal and the admin
+// UI hold a password to the same standard; only the asking belongs here.
 func confirmWeakPassword(ctx context.Context, password string) error {
-	if n := utf8.RuneCountInString(password); n < minPasswordLength {
-		fmt.Printf("\nThis password is %d characters; %d or more is the usual advice.\n"+
-			"Short passwords are the ones that fall first if the database is ever leaked.\n",
-			n, minPasswordLength)
-		if err := confirm("Use it anyway?"); err != nil {
-			return err
-		}
-	}
-
-	count, err := (&authn.BreachChecker{}).Count(ctx, password)
-	if err != nil {
-		fmt.Printf("\nCould not check this password against known breaches: %v\n", err)
-		return confirm("Set it anyway?")
-	}
-	if count == 0 {
+	advice := authn.CheckPassword(ctx, nil, password)
+	if !advice.Concerning() {
 		return nil
 	}
-
-	fmt.Printf("\nThis password appears %s in known breaches.\n"+
-		"Anything that has leaked is in the lists attackers try first, however long it is.\n",
-		times(count))
-	return confirm("Use it anyway?")
-}
-
-func times(n int) string {
-	if n == 1 {
-		return "once"
+	for _, warning := range advice.Warnings() {
+		fmt.Printf("\n%s\n", warning)
 	}
-	return fmt.Sprintf("%d times", n)
+	return confirm("Use it anyway?")
 }
 
 // confirm asks a yes/no question, defaulting to no.
@@ -313,20 +277,20 @@ func issueEnrollment(ctx context.Context, store *authn.Store, args []string, bas
 	if err != nil {
 		return err
 	}
-	// Enrolling a passkey requires the account's password, so an account with
-	// none cannot complete the ceremony.
-	if !account.HasPassword() {
-		return fmt.Errorf("%s has no password yet; set one first with: ihlvn account passwd %s", name, name)
-	}
-
 	token, err := store.CreateEnrollToken(ctx, account.ID, ttl)
 	if err != nil {
 		return err
 	}
 	// Printed rather than logged, so the link never lands in a request log.
-	fmt.Printf("Single-use enrollment link for %s, valid for %s:\n\n  %s\n\n"+
-		"They will be asked for their password to complete it.\n",
-		account.Name, ttl, authn.EnrollURL(baseURL, token))
+	// An account with no password yet chooses one as it enrols, so the link is
+	// the whole of what it needs — which is what lets an account be created and
+	// handed over without a password ever being conveyed.
+	asked := "They will be asked for their password to complete it."
+	if !account.HasPassword() {
+		asked = "They will choose a password as they complete it."
+	}
+	fmt.Printf("Single-use enrollment link for %s, valid for %s:\n\n  %s\n\n%s\n",
+		account.Name, ttl, authn.EnrollURL(baseURL, token), asked)
 	return nil
 }
 

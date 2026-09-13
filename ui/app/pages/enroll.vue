@@ -2,7 +2,11 @@
   <article class="flex h-screen w-screen items-center justify-center bg-amber-400">
     <div class="w-96 rounded bg-white p-6 shadow">
       <h1 class="text-lg font-semibold">Register a device</h1>
-      <p class="mt-2 text-sm text-gray-600">
+      <p v-if="first" class="mt-2 text-sm text-gray-600">
+        This link adds a passkey to your account. Choose a password to go with
+        it — it is what you will need to add or remove a device later.
+      </p>
+      <p v-else class="mt-2 text-sm text-gray-600">
         This link lets you add a passkey to your account. Your password is
         needed as well, so that opening the link alone is not enough.
       </p>
@@ -14,7 +18,12 @@
       />
 
       <form v-else class="mt-4 flex flex-col gap-3" @submit.prevent="submit">
-        <UInput v-model="password" type="password" placeholder="Your password" autocomplete="current-password" />
+        <UInput
+          v-model="password"
+          type="password"
+          :placeholder="first ? 'Choose a password' : 'Your password'"
+          :autocomplete="first ? 'new-password' : 'current-password'"
+        />
         <UInput v-model="name" placeholder="Name for this device, e.g. Laptop" />
         <UButton type="submit" :loading="busy" block>Register this device</UButton>
       </form>
@@ -46,8 +55,25 @@ const done = ref(false)
 const error = ref('')
 const reason = ref('')
 
-onMounted(() => {
+// Whether this account is choosing its first password or proving the one it
+// has. Asked of the server, because the page cannot tell from the link — and
+// asking the wrong question means a form that says "your password" to someone
+// who does not have one yet.
+const first = ref(false)
+
+onMounted(async () => {
   reason.value = passkey.unavailable()
+  try {
+    const state = await $fetch<{ has_password: boolean }>('/auth/enroll/state', {
+      baseURL: useRuntimeConfig().public.api.base as string,
+      credentials: 'include',
+    })
+    first.value = !state.has_password
+  }
+  catch {
+    // Not knowing is not worth blocking on: the form still works, it just asks
+    // the more common question.
+  }
 })
 
 async function submit() {

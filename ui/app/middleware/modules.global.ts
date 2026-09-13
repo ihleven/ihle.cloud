@@ -14,6 +14,7 @@ const AREA_BY_PREFIX: Record<string, string> = {
   '/mediathek': 'mediathek',
   '/musik': 'musik',
   '/search': 'search',
+  '/admin': 'admin',
 }
 
 export default defineNuxtRouteMiddleware((to) => {

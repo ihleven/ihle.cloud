@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -142,11 +143,11 @@ func (s *Service) RegisterBegin(w http.ResponseWriter, r *http.Request) error {
 		return errNoPasskeys
 	}
 
-	account, err := s.registrant(r)
+	account, viaLink, err := s.registrant(r)
 	if err != nil {
 		return err
 	}
-	if err := s.reauthenticate(r, account); err != nil {
+	if err := s.authorizeRegistration(r, account, viaLink); err != nil {
 		return err
 	}
 
@@ -248,26 +249,102 @@ func (s *Service) RegisterFinish(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, map[string]any{"ok": true})
 }
 
+// EnrollState describes the enrollment the browser is holding a link for.
+//
+// The page needs it to ask the right question: an account that already has a
+// password is proving it, and one that has none is choosing it. Guessing wrong
+// is a form that says "your password" to someone who does not have one yet.
+//
+// It reveals nothing the holder of the link does not already have — the link
+// itself names the account.
+func (s *Service) EnrollState(w http.ResponseWriter, r *http.Request) error {
+	account, viaLink, err := s.registrant(r)
+	if err != nil {
+		return err
+	}
+	return writeJSON(w, struct {
+		Name        string `json:"name"`
+		DisplayName string `json:"display_name"`
+		HasPassword bool   `json:"has_password"`
+		ViaLink     bool   `json:"via_link"`
+	}{account.Name, account.DisplayName, account.HasPassword(), viaLink})
+}
+
 // registrant says on whose behalf a registration may proceed: the signed-in
 // account, or the holder of an unspent enrollment link. Without one of those,
 // anyone could attach a passkey to any account.
-func (s *Service) registrant(r *http.Request) (*Account, error) {
+func (s *Service) registrant(r *http.Request) (account *Account, viaLink bool, err error) {
 	if account, ok := s.Authenticate(r); ok {
-		return account, nil
+		return account, false, nil
 	}
 	token := cookieValue(r, enrollCookie)
 	if token == "" {
-		return nil, errStatus(http.StatusUnauthorized, "sign in, or open your enrollment link, first")
+		return nil, false, errStatus(http.StatusUnauthorized, "sign in, or open your enrollment link, first")
 	}
-	account, err := s.store.EnrollTokenAccount(r.Context(), token)
+	account, err = s.store.EnrollTokenAccount(r.Context(), token)
 	if errors.Is(err, ErrBadToken) {
-		return nil, errStatus(http.StatusUnauthorized, "this enrollment link is no longer valid")
+		return nil, false, errStatus(http.StatusUnauthorized, "this enrollment link is no longer valid")
 	}
-	return account, err
+	return account, true, err
 }
 
 // reauthenticate demands the account's password before a credential is added or
 // removed, so holding a session is not enough on its own.
+// authorizeRegistration decides whether this request may add a credential.
+//
+// An account that has a password proves it, every time — holding a session or an
+// enrollment link is not enough, or whoever stole one could attach a credential
+// of their own and keep access indefinitely.
+//
+// An account that has none is being set up. There is nothing to prove, so the
+// enrollment link is the proof: it is single-use, expires, and was issued by an
+// administrator for this account. The password typed alongside the new
+// credential becomes the account's first. Without this an account created in the
+// admin section could never enrol anything — it would need a password it has no
+// way to be given, which is the circle the CLI broke by being a terminal.
+//
+// A session is deliberately not accepted for that: a session for an account with
+// no password can only have come from a passkey, and that path has an
+// administrator in it already.
+func (s *Service) authorizeRegistration(r *http.Request, account *Account, viaLink bool) error {
+	if account.HasPassword() {
+		return s.reauthenticate(r, account)
+	}
+	if !viaLink {
+		return errStatus(http.StatusForbidden, "set a password before enrolling a security key")
+	}
+	return s.setFirstPassword(r, account)
+}
+
+// setFirstPassword stores the password chosen during enrollment.
+//
+// Only the hard bound is enforced. Length and breach screening are advice
+// elsewhere in this system rather than rules, and there is nobody here to put
+// the advice to: refusing would be a stricter policy than the one an
+// administrator is held to at the terminal.
+func (s *Service) setFirstPassword(r *http.Request, account *Account) error {
+	password := formValue(r, "password")
+	if password == "" {
+		return errBadRequest("choose a password to go with your passkey")
+	}
+	if TooLong(password) {
+		return errBadRequest(fmt.Sprintf("use at most %d characters", MaxPasswordLength))
+	}
+
+	hash, err := hashPassword(password)
+	if err != nil {
+		return err
+	}
+	if err := s.store.SetPasswordHash(r.Context(), account.ID, hash); err != nil {
+		return err
+	}
+	// Keep the loaded copy honest: the rest of the ceremony reads it, and it was
+	// loaded before the password existed.
+	account.passwordHash = hash
+	s.log.Info("first password set during enrollment", "account", account.Name)
+	return nil
+}
+
 func (s *Service) reauthenticate(r *http.Request, account *Account) error {
 	client := clientAddr(r)
 	if s.throttle.blocked(account.Name, client) {

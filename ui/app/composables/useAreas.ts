@@ -13,6 +13,7 @@ const areas = [
   { module: 'mediathek', icon: 'i-lucide-library', label: 'Mediathek', to: '/mediathek' },
   { module: 'musik', icon: 'i-lucide-music', label: 'Musik', to: '/musik' },
   { module: 'search', icon: 'i-feather-search', label: 'Search', to: '/search' },
+  { module: 'admin', icon: 'i-lucide-shield', label: 'Konten', to: '/admin' },
 ]
 
 export function useAreas() {
