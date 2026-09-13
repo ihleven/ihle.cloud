@@ -27,6 +27,12 @@
 </template>
 
 <script setup lang="ts">
+// Reachable without a session: whoever follows an enrollment link has an account
+// but has not signed in, and the link carries an enrollment cookie rather than a
+// session. Without this the app's sign-in overlay would cover the page they were
+// sent to.
+definePageMeta({ public: true })
+
 // The enrollment link lands on /auth/enroll, which moves the token into a
 // cookie and redirects here — so the token is not in this page's URL, and this
 // page never sees it.

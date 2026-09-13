@@ -3,9 +3,6 @@
 
     <section class="flex items-center justify-between bg-ral-7035">
       <Logo />
-      <NuxtLink to="/login" class="border border-transparent p-2">
-        <Icon name="settings" />
-      </NuxtLink>
     </section>
 
     <!-- Only the areas this account is entitled to. Someone who may see one
@@ -21,15 +18,13 @@
     </NuxtLink>
 
     <p v-if="!tiles.length" class="col-span-full p-8 text-muted">
-      <template v-if="session">Für dieses Konto ist noch nichts freigeschaltet.</template>
-      <template v-else><NuxtLink to="/login" class="underline">Anmelden</NuxtLink></template>
+      Für dieses Konto ist noch nichts freigeschaltet.
     </p>
 
   </main>
 </template>
 
 <script setup lang="ts">
-const { session } = useAuth()
 const { allowed } = useModules()
 
 // Each tile names the area it belongs to; the entitlement decides whether it is

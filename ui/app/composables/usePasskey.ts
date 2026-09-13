@@ -92,11 +92,17 @@ export function usePasskey() {
     return unavailable() === ''
   }
 
-  function post<T>(path: string, body?: unknown, form?: Record<string, string>): Promise<T> {
+  // The ceremony a begin opened. Sent back on the matching finish, because a
+  // browser may have two open at once — one offered in the username field's
+  // autofill, one started by the button — and a single cookie cannot name both.
+  const ceremonyHeader = 'X-Ceremony'
+
+  function post<T>(path: string, body?: unknown, form?: Record<string, string>, ceremony?: string): Promise<T> {
     return $fetch<T>(path, {
       baseURL: base,
       method: 'POST',
       credentials: 'include',
+      headers: ceremony ? { [ceremonyHeader]: ceremony } : undefined,
       body: form ? new URLSearchParams(form) : body,
     })
   }
@@ -133,7 +139,7 @@ export function usePasskey() {
   // stays pending until the person picks one — so it is started in the
   // background and aborted if they do something else.
   async function signIn(mediation?: CredentialMediationRequirement, signal?: AbortSignal): Promise<void> {
-    const options = await post<{ publicKey: PublicKeyCredentialRequestOptions }>('/auth/passkey/login/begin')
+    const options = await post<{ publicKey: PublicKeyCredentialRequestOptions, ceremony: string }>('/auth/passkey/login/begin')
 
     const publicKey = options.publicKey as unknown as Record<string, unknown>
     publicKey.challenge = fromBase64url(publicKey.challenge as unknown as string)
@@ -150,13 +156,13 @@ export function usePasskey() {
     }) as PublicKeyCredential | null
     if (!credential) throw new Error('no credential was returned')
 
-    await post('/auth/passkey/login/finish', encodeAssertion(credential))
+    await post('/auth/passkey/login/finish', encodeAssertion(credential), undefined, options.ceremony)
   }
 
   // Enrol a credential. Authorised either by being signed in or by holding an
   // enrollment link, and in both cases by the account's password.
   async function enrol(password: string, name: string): Promise<void> {
-    const options = await post<{ publicKey: PublicKeyCredentialCreationOptions }>(
+    const options = await post<{ publicKey: PublicKeyCredentialCreationOptions, ceremony: string }>(
       '/auth/passkey/register/begin', undefined, { password },
     )
 
@@ -179,6 +185,7 @@ export function usePasskey() {
       baseURL: base,
       method: 'POST',
       credentials: 'include',
+      headers: { [ceremonyHeader]: options.ceremony },
       body: encodeAttestation(credential),
     })
   }

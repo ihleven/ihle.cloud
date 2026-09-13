@@ -85,3 +85,35 @@ func TestUnregisteredPermissionsAreReported(t *testing.T) {
 		}
 	}
 }
+
+// "*" is a grant-all that content.Scope expands at build time, so reporting it
+// as a name this build does not define told the operator the opposite of what
+// it does: it grants everything, including every area.
+func TestTheWildcardIsNotReportedAsUnregistered(t *testing.T) {
+	a := &Account{CMS: CMSProfile{Permissions: []string{"*"}}}
+
+	if unknown := a.UnregisteredPermissions(); len(unknown) != 0 {
+		t.Errorf("UnregisteredPermissions() = %v, want none: \"*\" grants everything", unknown)
+	}
+}
+
+// The wildcard is matched as the entire permission string. A constrained form
+// is not expanded and really does grant nothing, so it must still be reported —
+// that is the case a laxer check would hide.
+func TestAConstrainedWildcardIsStillReported(t *testing.T) {
+	a := &Account{CMS: CMSProfile{Permissions: []string{"*:de"}}}
+
+	if unknown := a.UnregisteredPermissions(); !slices.Contains(unknown, "*:de") {
+		t.Errorf("UnregisteredPermissions() = %v, want it to report \"*:de\"", unknown)
+	}
+}
+
+// A genuinely unknown name is still reported; the wildcard exemption must not
+// widen into "anything goes".
+func TestAnUnknownPermissionIsStillReported(t *testing.T) {
+	a := &Account{CMS: CMSProfile{Permissions: []string{"module.nosuchthing"}}}
+
+	if unknown := a.UnregisteredPermissions(); !slices.Contains(unknown, "module.nosuchthing") {
+		t.Errorf("UnregisteredPermissions() = %v, want it to report the unknown name", unknown)
+	}
+}

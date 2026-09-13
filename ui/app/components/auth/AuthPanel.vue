@@ -20,7 +20,6 @@
 
     <template v-else>
       <p class="text-muted">Nicht angemeldet.</p>
-      <UButton class="mt-4" to="/login" color="neutral" variant="subtle" label="Login" />
     </template>
   </div>
 </template>

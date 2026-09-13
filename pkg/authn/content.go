@@ -29,6 +29,10 @@ func (a *Account) EntitledModules() []string {
 	return modules.Entitled(a.ContentUser().Scope)
 }
 
+// wildcardPermission is content.Scope's grant-all, matched there as the entire
+// permission string.
+const wildcardPermission = "*"
+
 // UnregisteredPermissions returns the account's permission strings that no
 // package in this binary has defined. The CMS drops them silently when building
 // a scope, so an account can appear to hold rights that grant nothing; the admin
@@ -41,6 +45,14 @@ func (a *Account) UnregisteredPermissions() []string {
 
 	var unknown []string
 	for _, p := range a.CMS.Permissions {
+		// "*" is not a permission name but a grant-all the scope expands to every
+		// registered permission when it is built. It is the whole string or
+		// nothing: a constrained form like "*:de" is not expanded, and so really
+		// does grant nothing.
+		if p == wildcardPermission {
+			continue
+		}
+
 		// A permission may carry locale and path constraints after a colon;
 		// only the name is registered.
 		name := p

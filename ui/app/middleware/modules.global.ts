@@ -23,10 +23,10 @@ export default defineNuxtRouteMiddleware((to) => {
   const { session } = useAuth()
   const { may } = useModules()
 
-  // Not signed in at all: the sign-in page is the answer, not a refusal.
-  if (!session.value) {
-    return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
-  }
+  // Not signed in at all is not this guard's business: app.vue shows the
+  // sign-in overlay over whatever route was asked for, and reveals that same
+  // route once the person signs in. There is nothing to redirect to.
+  if (!session.value) return
 
   const area = AREA_BY_PREFIX[prefix]!
   if (!may(area)) {

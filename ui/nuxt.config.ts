@@ -30,6 +30,12 @@ export default defineNuxtConfig({
     { path: '~/components', pathPrefix: false },
   ],
 
+  // A production build can be sent to its own directory, so that a `nuxt dev`
+  // server left running — which keeps rewriting the build directory in
+  // development mode — cannot leak its own asset URLs into the generated HTML.
+  // Unset, this is the usual .nuxt, so `nuxt dev` is unaffected.
+  buildDir: process.env.NUXT_BUILD_DIR || '.nuxt',
+
   devtools: { enabled: true },
 
   // Added to the home screen on an iPhone, the app opens without Safari's

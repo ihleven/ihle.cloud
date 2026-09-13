@@ -76,7 +76,7 @@ func (s *Service) LoginBegin(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.setCeremonyCookie(w, id)
-	return writeJSON(w, assertion)
+	return writeJSON(w, ceremonyEnvelope{PublicKey: assertion.Response, Ceremony: id})
 }
 
 // LoginFinish verifies the assertion and starts a session.
@@ -87,7 +87,7 @@ func (s *Service) LoginFinish(w http.ResponseWriter, r *http.Request) error {
 	if s.wa == nil {
 		return errNoPasskeys
 	}
-	challenge, err := s.takeCeremony(w, r, PurposeLogin)
+	challenge, err := s.takeCeremony(r, PurposeLogin)
 	if err != nil {
 		return err
 	}
@@ -112,6 +112,7 @@ func (s *Service) LoginFinish(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	s.clearCookie(w, s.cfg.CeremonyCookie)
 	s.setSessionCookie(w, token)
 	s.log.Info("signed in with a passkey", "account", account.account.Name)
 
@@ -187,7 +188,7 @@ func (s *Service) RegisterBegin(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.setCeremonyCookie(w, id)
-	return writeJSON(w, creation)
+	return writeJSON(w, ceremonyEnvelope{PublicKey: creation.Response, Ceremony: id})
 }
 
 // RegisterFinish stores the new credential, refusing one that can be synced.
@@ -195,7 +196,7 @@ func (s *Service) RegisterFinish(w http.ResponseWriter, r *http.Request) error {
 	if s.wa == nil {
 		return errNoPasskeys
 	}
-	challenge, err := s.takeCeremony(w, r, PurposeRegister)
+	challenge, err := s.takeCeremony(r, PurposeRegister)
 	if err != nil {
 		return err
 	}
@@ -241,6 +242,7 @@ func (s *Service) RegisterFinish(w http.ResponseWriter, r *http.Request) error {
 		}
 		s.clearCookie(w, enrollCookie)
 	}
+	s.clearCookie(w, s.cfg.CeremonyCookie)
 	s.log.Info("passkey enrolled", "account", account.Name)
 
 	return writeJSON(w, map[string]any{"ok": true})
@@ -377,9 +379,26 @@ func (s *Service) Enroll(w http.ResponseWriter, r *http.Request) error {
 
 // ----------------------------------------------------------------- shared --
 
-// The challenge id travels in a cookie rather than in the JSON the page holds,
-// so a script cannot substitute one ceremony's challenge into another's
-// completion.
+// CeremonyHeader carries the challenge id back from the page that started the
+// ceremony. It exists because a browser can have two ceremonies open at once:
+// one offered silently in the username field's autofill, one started by the
+// button. A single cookie cannot name both, so the second to finish used to
+// find no ceremony at all.
+//
+// Sending the id is not a weakening: a challenge is single-use and scoped to its
+// purpose server-side, and knowing its id proves nothing — completing it still
+// needs a signature over that challenge from a registered credential.
+const CeremonyHeader = "X-Ceremony"
+
+// ceremonyEnvelope is what a begin returns: the options the browser needs, plus
+// the id of the ceremony they belong to.
+type ceremonyEnvelope struct {
+	PublicKey any    `json:"publicKey"`
+	Ceremony  string `json:"ceremony"`
+}
+
+// The challenge id also travels in a cookie, so a page that does not send the
+// header still works, and so a ceremony is tied to the browser that began it.
 func (s *Service) setCeremonyCookie(w http.ResponseWriter, id string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.cfg.CeremonyCookie,
@@ -392,12 +411,20 @@ func (s *Service) setCeremonyCookie(w http.ResponseWriter, id string) {
 	})
 }
 
-func (s *Service) takeCeremony(w http.ResponseWriter, r *http.Request, purpose string) (*Challenge, error) {
-	id := cookieValue(r, s.cfg.CeremonyCookie)
+// takeCeremony resolves which ceremony is being completed.
+//
+// The cookie is deliberately not cleared here. It used to be, before the
+// assertion had even been checked, so one attempt that failed — or one of two
+// concurrent attempts — destroyed the other. The challenge itself is single-use
+// in the store, which is what actually stops a replay.
+func (s *Service) takeCeremony(r *http.Request, purpose string) (*Challenge, error) {
+	id := r.Header.Get(CeremonyHeader)
+	if id == "" {
+		id = cookieValue(r, s.cfg.CeremonyCookie)
+	}
 	if id == "" {
 		return nil, errBadRequest("no ceremony is in progress")
 	}
-	s.clearCookie(w, s.cfg.CeremonyCookie)
 
 	challenge, err := s.store.TakeChallenge(r.Context(), purpose, id)
 	if errors.Is(err, ErrBadToken) {

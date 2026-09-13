@@ -3,7 +3,9 @@ package authn
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -17,7 +19,8 @@ import (
 // challenge cannot be replayed, that a session disappears when it is deleted.
 // A stub would only prove that the stub behaves.
 //
-// Set IHLVN_TEST_DATABASE_URL to a database that may be truncated between tests.
+// Set IHLVN_TEST_DATABASE_URL to a database that may be destroyed: this helper
+// truncates, so the name has to say so.
 func testStore(t *testing.T) (*Store, context.Context) {
 	t.Helper()
 
@@ -25,6 +28,7 @@ func testStore(t *testing.T) (*Store, context.Context) {
 	if url == "" {
 		t.Skip("IHLVN_TEST_DATABASE_URL not set")
 	}
+	requireDisposable(t, url)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
@@ -41,6 +45,40 @@ func testStore(t *testing.T) (*Store, context.Context) {
 		t.Fatalf("truncating: %v", err)
 	}
 	return NewStore(pool), ctx
+}
+
+// requireDisposable refuses a database whose name does not mark it as one that
+// may be destroyed.
+//
+// The truncate below is cascading and irreversible, and an environment variable
+// carries no hint of what it is pointing at. Aiming this at a development
+// database once cost four accounts, their passkeys and their permissions — and
+// the emptied tables then read as "there was never an account here", which is a
+// worse failure than an error, because it looks like a finding.
+func requireDisposable(t *testing.T, rawURL string) {
+	t.Helper()
+
+	name := databaseName(rawURL)
+	if !strings.Contains(strings.ToLower(name), "test") {
+		t.Fatalf("IHLVN_TEST_DATABASE_URL points at %q, which is not named as a test database.\n"+
+			"These tests truncate every table. Use one that may be destroyed:\n"+
+			"    createdb ihlvn_test\n"+
+			"    IHLVN_TEST_DATABASE_URL=postgres:///ihlvn_test go test ./pkg/authn/", name)
+	}
+}
+
+// databaseName is the database a connection string names, in either the URL or
+// the keyword form. An unreadable string yields "", which the guard refuses.
+func databaseName(rawURL string) string {
+	if u, err := url.Parse(rawURL); err == nil && u.Scheme != "" {
+		return strings.TrimPrefix(u.Path, "/")
+	}
+	for _, field := range strings.Fields(rawURL) {
+		if rest, ok := strings.CutPrefix(field, "dbname="); ok {
+			return rest
+		}
+	}
+	return ""
 }
 
 func mustAccount(t *testing.T, s *Store, ctx context.Context, name string) *Account {

@@ -15,8 +15,13 @@ all: ui build
 version:
 	@CGO_ENABLED=0 go run -ldflags=${LDFLAGS} main.go --version
 
+# The frontend is built into its own directory rather than .nuxt, because a
+# `nuxt dev` server left running rewrites .nuxt in development mode while this
+# reads it. The generated HTML then points at the dev server's own assets, which
+# 404 in production: a build that succeeds and serves a blank page. Deploying
+# that is the expensive way to find out.
 ui:
-	cd ui; bun install; bun run generate
+	cd ui; bun install; NUXT_BUILD_DIR=.nuxt-build bun run generate
 
 build: 
 	@CGO_ENABLED=0 go build -o ${OUT} -ldflags=${LDFLAGS} 
@@ -97,6 +102,7 @@ cms:
 clean:
 	-@rm ${OUT} ${OUT}-linux-$(DEPLOY_ARCH) gin-bin
 	-@rm -rf ui/.nuxt 
+	-@rm -rf ui/.nuxt-build 
 	-@rm -rf ui/.output 
 	-@rm -rf ui/node_modules 
 
