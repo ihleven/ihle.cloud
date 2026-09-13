@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 
-	"github.com/ihleven/ihlvn/pkg/authn"
+	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/ihleven/ihlvn/pkg/hi"
 	"github.com/interhome-group/cms/pkg/errs"
 )
@@ -31,7 +31,7 @@ type TokenSource interface {
 // request.
 func Proxy(tokens TokenSource) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		account, ok := authn.FromContext(r.Context())
+		account, ok := auth.FromContext(r.Context())
 		if !ok {
 			return errs.New("not allowed", errs.HTTPStatus(http.StatusUnauthorized))
 		}

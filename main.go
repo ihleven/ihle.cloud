@@ -6,22 +6,20 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/ihleven/ihlvn/app/accounts"
 	"github.com/ihleven/ihlvn/app/art/importart"
+	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/ihleven/ihlvn/app/cmsapi"
 	"github.com/ihleven/ihlvn/app/db"
 	"github.com/ihleven/ihlvn/app/films"
+	"github.com/ihleven/ihlvn/app/hidrive"
 	"github.com/ihleven/ihlvn/app/media"
-	"github.com/ihleven/ihlvn/pkg/authn"
 	"github.com/ihleven/ihlvn/pkg/blob"
 	"github.com/ihleven/ihlvn/pkg/cmd"
 	"github.com/ihleven/ihlvn/pkg/mail"
@@ -31,14 +29,12 @@ import (
 	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/mgmt"
 	"github.com/interhome-group/cms/mgmt/search"
-	"github.com/interhome-group/cms/pkg/errs"
 
 	"github.com/alexflint/go-arg"
 	"github.com/ihleven/ihlvn/app/art"
 	"github.com/ihleven/ihlvn/app/familie"
 	"github.com/ihleven/ihlvn/pkg/api"
 	"github.com/ihleven/ihlvn/pkg/hi"
-	"github.com/ihleven/ihlvn/pkg/hiauth"
 
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -74,12 +70,18 @@ type Flags struct {
 	CookieSecure   *bool         `arg:"env:COOKIE_SECURE"                                     help:"mark auth cookies Secure. Unset derives it from PUBLIC_URL's scheme, which is almost always what you want"`
 	PublicURL      string        `arg:"--public-url,env:PUBLIC_URL"            default:"http://localhost:8000" placeholder:"URL" help:"the URL a browser reaches this app at. Behind a proxy this is the public https URL, not the local port. Passkey, cookie and OAuth settings derive from it"`
 	CorsOrigins    []string      `arg:"--cors-origin,env:CORS_ORIGINS"                        help:"origins allowed to call this app cross-site. Empty is correct when the app serves its own frontend"`
-	DbConn         string        `arg:"env:DB_CONN"                            default:"postgres://localhost:5432/authdb" placeholder:"CONN"`
-	PasskeyRPID    string        `arg:"--passkey-rpid,env:PASSKEY_RPID"        default:"" help:"WebAuthn relying party id. Unset derives it from PUBLIC_URL's host; set it to a parent domain to share credentials across subdomains" placeholder:"HOST"`
-	PasskeyOrigins []string      `arg:"--passkey-origin,env:PASSKEY_ORIGINS"   help:"origins a passkey ceremony may come from. Unset derives PUBLIC_URL" placeholder:"URL"`
-	Pidfile        string        `arg:"--pid-file,   env:PIDFILE"              default:"" placeholder:"FILENAME"`
-	SPAPath        string        `arg:"--spa-path,   env:SPA_PATH"             default:"ui/.output/public" placeholder:"DIR" help:"path to nuxt spa"`
-	Debug          bool          `arg:"-d,--debug,env:DEBUG" help:"verbose diagnostics, including CORS decisions"`
+	// MinPasswordLength is where the "this is short" warning starts, not a rule:
+	// nothing refuses a password for being under it. It lives here because the
+	// terminal, the admin form and the sentence that form shows all have to agree
+	// on the number.
+	MinPasswordLength int `arg:"env:MIN_PASSWORD_LENGTH" default:"12" help:"length below which a password is called short"`
+
+	DbConn         string   `arg:"env:DB_CONN"                            default:"postgres://localhost:5432/authdb" placeholder:"CONN"`
+	PasskeyRPID    string   `arg:"--passkey-rpid,env:PASSKEY_RPID"        default:"" help:"WebAuthn relying party id. Unset derives it from PUBLIC_URL's host; set it to a parent domain to share credentials across subdomains" placeholder:"HOST"`
+	PasskeyOrigins []string `arg:"--passkey-origin,env:PASSKEY_ORIGINS"   help:"origins a passkey ceremony may come from. Unset derives PUBLIC_URL" placeholder:"URL"`
+	Pidfile        string   `arg:"--pid-file,   env:PIDFILE"              default:"" placeholder:"FILENAME"`
+	SPAPath        string   `arg:"--spa-path,   env:SPA_PATH"             default:"ui/.output/public" placeholder:"DIR" help:"path to nuxt spa"`
+	Debug          bool     `arg:"-d,--debug,env:DEBUG" help:"verbose diagnostics, including CORS decisions"`
 	// 	Pretty       bool   `arg:"--pretty,env:LOG_PRETTY"                      help:"Enable pretty logging"`
 	// 	Verbose      bool   `arg:"-v,--verbose,env"                             help:"Enable verbose mode"`
 }
@@ -174,7 +176,10 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		log.Fatal(err)
 	}
 
-	hitokens := hiDriveTokens{hiauth.NewTokenMngr(pg)}
+	hidriveTokens := hidrive.NewStore(pg.Pool())
+	hitokens := hidrive.NewAccessTokens(hidriveTokens)
+	hidriveOAuth := hidrive.NewOAuth(flags.HidriveClientID, flags.HidriveClientSecret,
+		site.OAuthRedirect, hidriveTokens)
 
 	// The drive media is delivered from. Stat results are cached because every
 	// ranged request needs the object's size and validators before it can
@@ -203,7 +208,7 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 
 	// The enrollment link's lifetime matches the CLI's default: long enough to
 	// hand over, short enough that a link left in a chat log stops working.
-	admin := accounts.New(authn.NewStore(pg.Pool()), site.Origin, 15*time.Minute)
+	admin := auth.NewAdminAPI(auth.NewAdmin(auth.NewStore(pg.Pool()), site.Origin, 15*time.Minute, flags.MinPasswordLength))
 
 	var route = api.WithRoute
 
@@ -214,8 +219,8 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		// route(" POST /tokenauth                ", tokenauth), // soll token liefern für spezielle Funktionalität
 		// Binding a HiDrive account is an operator action, not something a
 		// visitor can start.
-		route("      /apihle/auth/authorize    ", requireAccount(authsvc, site.authorize(flags))),
-		route("      "+oauthCallbackPath+"     ", requireAccount(authsvc, site.callback(flags, pg))),
+		route("      /apihle/auth/authorize    ", requireAccount(authsvc, hidriveOAuth.Authorize)),
+		route("      "+oauthCallbackPath+"     ", requireAccount(authsvc, hidriveOAuth.Callback)),
 
 		route("      /auth/login         ", authsvc.Login),
 		route("      /auth/logout        ", authsvc.Logout),
@@ -229,7 +234,6 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route(" POST /auth/passkey/register/finish  ", authsvc.RegisterFinish),
 		route(" DELETE /auth/passkey/{id}           ", authsvc.DeletePasskey),
 		route("  GET /auth/enroll                   ", authsvc.Enroll),
-		route("  GET /auth/enroll/state             ", authsvc.EnrollState),
 		route("  GET /auth/passkey                  ", authsvc.Passkeys),
 
 		route("      /api/auth/login         ", authsvc.Login),
@@ -276,7 +280,7 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("     GET /api/v1/admin/accounts/{name}               ", requireAdmin(authsvc, admin.Get)),
 		route("     PUT /api/v1/admin/accounts/{name}               ", requireAdmin(authsvc, admin.Update)),
 		route("    POST /api/v1/admin/accounts/{name}/password      ", requireAdmin(authsvc, admin.SetPassword)),
-		route("    POST /api/v1/admin/accounts/{name}/enroll        ", requireAdmin(authsvc, admin.Enroll)),
+		route("    POST /api/v1/admin/accounts/{name}/enroll        ", requireAdmin(authsvc, admin.IssueEnrollment)),
 		route("     GET /api/v1/admin/accounts/{name}/passkeys      ", requireAdmin(authsvc, admin.Passkeys)),
 		route("  DELETE /api/v1/admin/accounts/{name}/passkeys/{id} ", requireAdmin(authsvc, admin.DeletePasskey)),
 		route("  DELETE /api/v1/admin/accounts/{name}/passkeys      ", requireAdmin(authsvc, admin.Revoke)),
@@ -286,80 +290,6 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	log.Printf("serving %s on port %d", site.Origin, cmd.Port)
 
 	return srvr.ListenAndServe(cmd.Port, flags.CorsOrigins, flags.Debug)
-}
-
-// authorize starts the HiDrive consent flow, which is how a refresh token is
-// obtained for an alias in the first place — the session system authenticates
-// people, this authorises storage access.
-//
-// The redirect_uri is built from the public URL and has to match the
-// registration held by HiDrive exactly, so changing the domain means updating it
-// there too.
-func (site *site) authorize(flags Flags) func(http.ResponseWriter, *http.Request) error {
-	return func(w http.ResponseWriter, r *http.Request) error {
-		// state comes back untouched and is where the browser is sent
-		// afterwards, so it is a path on this site and is validated as one.
-		next := r.URL.Query().Get("state")
-		if next == "" {
-			next = "/"
-		}
-		if !isLocalPath(next) {
-			return errs.New("state must be a path on this site", errs.HTTPStatus(http.StatusBadRequest))
-		}
-
-		params := url.Values{
-			"client_id":     {flags.HidriveClientID},
-			"response_type": {"code"},
-			"scope":         {"admin,rw"},
-			"state":         {next},
-			"redirect_uri":  {site.OAuthRedirect},
-		}
-		http.Redirect(w, r, "https://my.hidrive.com/client/authorize?"+params.Encode(), http.StatusSeeOther)
-		return nil
-	}
-}
-
-// isLocalPath keeps a redirect on this site. Without it the state parameter is
-// an open redirect: whatever it holds is where the browser ends up.
-func isLocalPath(p string) bool {
-	return strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "//")
-}
-
-func (site *site) callback(flags Flags, db *db.DB) func(w http.ResponseWriter, r *http.Request) error {
-	return func(w http.ResponseWriter, r *http.Request) error {
-
-		token, err := hiauth.RefreshTokenWithAuthCode(
-			flags.HidriveClientID, flags.HidriveClientSecret, r.URL.Query().Get("code"))
-		if err != nil {
-			return errs.Wrap(err, "exchanging the authorization code", errs.HTTPStatus(http.StatusUnauthorized))
-		}
-		if err := db.StoreToken(token); err != nil {
-			return err
-		}
-
-		// SameSite=None is only accepted alongside Secure, so over plain http the
-		// pairing has to fall back or the browser discards the cookie outright.
-		sameSite := http.SameSiteNoneMode
-		if !site.CookieSecure {
-			sameSite = http.SameSiteLaxMode
-		}
-		http.SetCookie(w, &http.Cookie{
-			Name:     "hitoken",
-			Value:    token.AccessToken,
-			Path:     "/",
-			MaxAge:   token.ExpiresIn,
-			HttpOnly: true,
-			Secure:   site.CookieSecure,
-			SameSite: sameSite,
-		})
-
-		next := r.URL.Query().Get("state")
-		if !isLocalPath(next) {
-			next = "/"
-		}
-		http.Redirect(w, r, next, http.StatusSeeOther)
-		return nil
-	}
 }
 
 // func RequestToken(id, secret, code string) (*hi.Token, error) {

@@ -5,16 +5,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ihleven/ihlvn/pkg/authn"
+	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/interhome-group/cms/pkg/errs"
 )
 
 // signedInAs answers every request with the given account, or with nobody when
 // it is nil. Standing in for the session service keeps these tests on the
 // entitlement decision rather than on how a cookie is read.
-type signedInAs struct{ account *authn.Account }
+type signedInAs struct{ account *auth.Account }
 
-func (s signedInAs) Authenticate(*http.Request) (*authn.Account, bool) {
+func (s signedInAs) Authenticate(*http.Request) (*auth.Account, bool) {
 	return s.account, s.account != nil
 }
 
@@ -46,9 +46,9 @@ func TestRequireAdmin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			account := &authn.Account{
+			account := &auth.Account{
 				Name: "someone",
-				CMS:  authn.CMSProfile{Permissions: tt.permissions},
+				CMS:  auth.CMSProfile{Permissions: tt.permissions},
 			}
 
 			reached := false

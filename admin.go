@@ -13,15 +13,24 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/ihleven/ihlvn/app/db"
-	"github.com/ihleven/ihlvn/pkg/authn"
+	"github.com/ihleven/ihlvn/pkg/password"
 )
 
-// Account administration.
+// Account administration from a terminal.
+//
+// The rules live in auth.Admin, which the admin section calls too; what is here
+// is a terminal's half of the conversation — reading arguments, laying out
+// tables, and asking questions that only make sense when someone is watching.
 //
 // There is no self-service registration: an operator creates an account and
-// gives the person a password or a single-use enrollment link out of band. That
-// keeps the public surface at the sign-in form and nothing else.
+// hands over a single-use enrollment link out of band. That keeps the public
+// surface at the sign-in form and nothing else.
+//
+// Nothing here puts an account in the context, so the lock-out guard does not
+// apply: the terminal is deliberately the way back in when the browser has
+// locked someone out.
 
 type AccountCmd struct {
 	Action string   `arg:"positional" help:"list | add | passwd | permissions | groups | enroll | passkeys | revoke | disable | enable"`
@@ -43,32 +52,32 @@ func (c *AccountCmd) Run(flags Flags) error {
 
 	// The commands share the server's migration step, so a command can never
 	// talk to a schema the binary does not expect.
-	if err := authn.Migrate(ctx, pg.Pool()); err != nil {
+	if err := db.Migrate(ctx, pg.Pool()); err != nil {
 		return err
 	}
-	store := authn.NewStore(pg.Pool())
+	admin := auth.NewAdmin(auth.NewStore(pg.Pool()), c.BaseURL, c.TTL, flags.MinPasswordLength)
 
 	switch c.Action {
 	case "", "list":
-		return listAccounts(ctx, store, os.Stdout)
+		return listAccounts(ctx, admin, os.Stdout)
 	case "add":
-		return addAccount(ctx, store, c.Args)
+		return addAccount(ctx, admin, c.Args)
 	case "passwd":
-		return setPassword(ctx, store, c.Args)
+		return setPassword(ctx, admin, c.Args)
 	case "enroll":
-		return issueEnrollment(ctx, store, c.Args, c.BaseURL, c.TTL)
+		return issueEnrollment(ctx, admin, c.Args)
 	case "permissions":
-		return setCMSField(ctx, store, c.Args, "permissions")
+		return setCMSField(ctx, admin, c.Args, "permissions")
 	case "groups":
-		return setCMSField(ctx, store, c.Args, "groups")
+		return setCMSField(ctx, admin, c.Args, "groups")
 	case "passkeys":
-		return listPasskeys(ctx, store, os.Stdout, c.Args)
+		return listPasskeys(ctx, admin, os.Stdout, c.Args)
 	case "revoke":
-		return revokeCredentials(ctx, store, c.Args)
+		return revokeCredentials(ctx, admin, c.Args)
 	case "disable":
-		return setDisabled(ctx, store, c.Args, true)
+		return setDisabled(ctx, admin, c.Args, true)
 	case "enable":
-		return setDisabled(ctx, store, c.Args, false)
+		return setDisabled(ctx, admin, c.Args, false)
 	default:
 		return fmt.Errorf("unknown action %q; try list, add, passwd, permissions, groups, enroll, passkeys, revoke, disable or enable", c.Action)
 	}
@@ -81,8 +90,18 @@ func firstArg(args []string, what string) (string, error) {
 	return args[0], nil
 }
 
-func listAccounts(ctx context.Context, store *authn.Store, out io.Writer) error {
-	accounts, err := store.ListAccounts(ctx)
+// named puts a failure into a terminal's words. Only the "no such account" case
+// needs it: everything else already reads as a sentence, because auth.Admin
+// writes its refusals for a person rather than for a status code.
+func named(name string, err error) error {
+	if errors.Is(err, auth.ErrNoAccount) {
+		return fmt.Errorf("no account named %q", name)
+	}
+	return err
+}
+
+func listAccounts(ctx context.Context, admin *auth.Admin, out io.Writer) error {
+	accounts, err := admin.List(ctx)
 	if err != nil {
 		return err
 	}
@@ -90,21 +109,16 @@ func listAccounts(ctx context.Context, store *authn.Store, out io.Writer) error 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tDISPLAY\tEMAIL\tSTATE\tCREDENTIALS\tGROUPS\tPERMISSIONS")
 	for _, a := range accounts {
-		keys, err := store.ListPasskeys(ctx, a.ID)
-		if err != nil {
-			return err
-		}
-
 		state := "active"
 		if a.Disabled {
 			state = "disabled"
 		}
 		var credentials []string
-		if a.HasPassword() {
+		if a.HasPassword {
 			credentials = append(credentials, "password")
 		}
-		if len(keys) > 0 {
-			credentials = append(credentials, fmt.Sprintf("%d passkey(s)", len(keys)))
+		if a.Passkeys > 0 {
+			credentials = append(credentials, fmt.Sprintf("%d passkey(s)", a.Passkeys))
 		}
 		if len(credentials) == 0 {
 			credentials = append(credentials, "none")
@@ -113,7 +127,7 @@ func listAccounts(ctx context.Context, store *authn.Store, out io.Writer) error 
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\n",
 			a.Name, a.DisplayName, a.Email, state,
 			strings.Join(credentials, ", "),
-			strings.Join(a.CMS.Groups, ","), len(a.CMS.Permissions))
+			strings.Join(a.Groups, ","), len(a.Permissions))
 	}
 	if err := w.Flush(); err != nil {
 		return err
@@ -122,15 +136,15 @@ func listAccounts(ctx context.Context, store *authn.Store, out io.Writer) error 
 	// A permission the CMS does not define is dropped when the scope is built,
 	// so it grants nothing while still looking like a grant in the database.
 	for _, a := range accounts {
-		if unknown := a.UnregisteredPermissions(); len(unknown) > 0 {
+		if len(a.Unregistered) > 0 {
 			fmt.Fprintf(out, "\n%s holds %d permission(s) this build does not define, which grant nothing:\n  %s\n",
-				a.Name, len(unknown), strings.Join(unknown, "\n  "))
+				a.Name, len(a.Unregistered), strings.Join(a.Unregistered, "\n  "))
 		}
 	}
 	return nil
 }
 
-func addAccount(ctx context.Context, store *authn.Store, args []string) error {
+func addAccount(ctx context.Context, admin *auth.Admin, args []string) error {
 	name, err := firstArg(args, "an account name")
 	if err != nil {
 		return err
@@ -138,38 +152,31 @@ func addAccount(ctx context.Context, store *authn.Store, args []string) error {
 	if len(args) < 2 {
 		return errors.New("expected an email address")
 	}
-	email := args[1]
 	display := name
 	if len(args) > 2 {
 		display = strings.Join(args[2:], " ")
 	}
 
-	account, err := store.CreateAccount(ctx, name, display, email)
-	if errors.Is(err, authn.ErrExists) {
-		return fmt.Errorf("an account named %q already exists", name)
-	}
+	account, err := admin.Create(ctx, auth.NewAccount{
+		Name: name, Email: args[1], DisplayName: display,
+	})
 	if err != nil {
 		return err
 	}
-	fmt.Printf("created %s (%s)\nSet a password with: ihlvn account passwd %s\n",
-		account.Name, account.Email, account.Name)
+	// Both steps, in order: a device cannot be registered without a password to
+	// prove, so the link is useless until there is one.
+	fmt.Printf("created %s (%s)\nNext: ihlvn account passwd %s, then ihlvn account enroll %s\n",
+		account.Name, account.Email, account.Name, account.Name)
 	return nil
 }
 
-func setPassword(ctx context.Context, store *authn.Store, args []string) error {
+func setPassword(ctx context.Context, admin *auth.Admin, args []string) error {
 	name, err := firstArg(args, "an account name")
 	if err != nil {
 		return err
 	}
-	account, err := store.AccountByName(ctx, name)
-	if errors.Is(err, authn.ErrNoAccount) {
-		return fmt.Errorf("no active account named %q", name)
-	}
-	if err != nil {
-		return err
-	}
 
-	password, err := readPasswordTwice()
+	plain, err := readPasswordTwice()
 	if err != nil {
 		return err
 	}
@@ -179,17 +186,24 @@ func setPassword(ctx context.Context, store *authn.Store, args []string) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
 
-	if err := confirmWeakPassword(ctx, password); err != nil {
-		return err
-	}
-	hash, err := authn.HashPassword(password)
+	// Asked for without confirmation first: the screening gets a chance to
+	// object, and nothing is written while it does.
+	result, err := admin.SetPassword(ctx, name, plain, false)
 	if err != nil {
-		return err
+		return named(name, err)
 	}
-	if err := store.SetPasswordHash(ctx, account.ID, hash); err != nil {
-		return err
+	if !result.Set {
+		for _, warning := range warnings(result.Advice) {
+			fmt.Printf("\n%s\n", warning)
+		}
+		if err := confirm("Use it anyway?"); err != nil {
+			return err
+		}
+		if _, err := admin.SetPassword(ctx, name, plain, true); err != nil {
+			return named(name, err)
+		}
 	}
-	fmt.Printf("password set for %s\n", account.Name)
+	fmt.Printf("password set for %s\n", name)
 	return nil
 }
 
@@ -217,37 +231,42 @@ func readPasswordTwice() (string, error) {
 	if string(first) != string(second) {
 		return "", errors.New("the two entries do not match")
 	}
-	// Counted in characters, not bytes: len() on the raw input would let eight
-	// emoji pass as "32", which is not what a length means to the person typing.
-	// Only the ceiling is refused here; being short is a warning, raised with the
-	// other advice once the password is known to be what was intended.
-	if authn.TooLong(string(first)) {
-		return "", fmt.Errorf("use at most %d characters", authn.MaxPasswordLength)
-	}
 	return string(first), nil
 }
 
-// confirmWeakPassword says what is wrong with a password and asks whether to use
-// it regardless.
+// warnings puts the advice into words, one concern per line, in the order they
+// matter: a leak outranks a length, because it is evidence rather than a
+// heuristic.
 //
-// Everything here is advice rather than a verdict. Refusing a short password
-// would substitute a number for the operator's judgement, and refusing a
-// breached one would let a third party's corpus decide what this system accepts
-// while leaving no way to override it. A screening failure — no network, service
-// down — is reported and blocks nothing, or setting a password would depend on
-// being online.
-//
-// What counts as weak is authn's to decide, so that the terminal and the admin
-// UI hold a password to the same standard; only the asking belongs here.
-func confirmWeakPassword(ctx context.Context, password string) error {
-	advice := authn.CheckPassword(ctx, nil, password)
-	if !advice.Concerning() {
-		return nil
+// The wording lives here rather than with the policy because it is this
+// command's half of a conversation — the admin form says the same things in
+// German, to someone who has not asked to be lectured about entropy.
+func warnings(a password.Advice) []string {
+	var out []string
+	if a.Breaches > 0 {
+		out = append(out, fmt.Sprintf(
+			"This password appears %s in known breaches. "+
+				"Anything that has leaked is in the lists attackers try first, however long it is.",
+			times(a.Breaches)))
 	}
-	for _, warning := range advice.Warnings() {
-		fmt.Printf("\n%s\n", warning)
+	if a.Unchecked != "" {
+		out = append(out, "Could not check this password against known breaches: "+a.Unchecked)
 	}
-	return confirm("Use it anyway?")
+	if a.TooShort {
+		out = append(out, fmt.Sprintf(
+			"This password is %d characters; %d or more is the usual advice. "+
+				"Short passwords are the ones that fall first if the database is ever leaked.",
+			a.Length, a.MinLength))
+	}
+	return out
+}
+
+// times reads a count as English, so a warning can be read aloud.
+func times(n int) string {
+	if n == 1 {
+		return "once"
+	}
+	return fmt.Sprintf("%d times", n)
 }
 
 // confirm asks a yes/no question, defaulting to no.
@@ -265,32 +284,23 @@ func confirm(question string) error {
 	}
 }
 
-func issueEnrollment(ctx context.Context, store *authn.Store, args []string, baseURL string, ttl time.Duration) error {
+func issueEnrollment(ctx context.Context, admin *auth.Admin, args []string) error {
 	name, err := firstArg(args, "an account name")
 	if err != nil {
 		return err
 	}
-	account, err := store.AccountByName(ctx, name)
-	if errors.Is(err, authn.ErrNoAccount) {
-		return fmt.Errorf("no active account named %q", name)
-	}
+	link, err := admin.IssueEnrollment(ctx, name)
 	if err != nil {
-		return err
+		return named(name, err)
 	}
-	token, err := store.CreateEnrollToken(ctx, account.ID, ttl)
-	if err != nil {
-		return err
-	}
-	// Printed rather than logged, so the link never lands in a request log.
-	// An account with no password yet chooses one as it enrols, so the link is
-	// the whole of what it needs — which is what lets an account be created and
-	// handed over without a password ever being conveyed.
-	asked := "They will be asked for their password to complete it."
-	if !account.HasPassword() {
-		asked = "They will choose a password as they complete it."
-	}
-	fmt.Printf("Single-use enrollment link for %s, valid for %s:\n\n  %s\n\n%s\n",
-		account.Name, ttl, authn.EnrollURL(baseURL, token), asked)
+
+	// Printed rather than logged, so the link never lands in a request log. The
+	// password is asked for as well when the link is redeemed, and is not in this
+	// output: the two have to travel separately or the pair of them is one
+	// factor.
+	fmt.Printf("Single-use enrollment link for %s, valid until %s:\n\n  %s\n\n"+
+		"They will be asked for their password to complete it.\n",
+		name, link.ExpiresAt.Format(time.TimeOnly), link.URL)
 	return nil
 }
 
@@ -300,25 +310,21 @@ func issueEnrollment(ctx context.Context, store *authn.Store, args []string, bas
 //
 // Replacing rather than adding keeps it obvious what an account ends up with:
 // the argument list is the result, not a delta.
-func setCMSField(ctx context.Context, store *authn.Store, args []string, field string) error {
+func setCMSField(ctx context.Context, admin *auth.Admin, args []string, field string) error {
 	name, err := firstArg(args, "an account name")
 	if err != nil {
 		return err
 	}
-	account, err := store.AccountByName(ctx, name)
-	if errors.Is(err, authn.ErrNoAccount) {
-		return fmt.Errorf("no active account named %q", name)
-	}
+	account, err := admin.Get(ctx, name)
 	if err != nil {
-		return err
+		return named(name, err)
 	}
 
-	profile := account.CMS
 	values := args[1:]
 	if len(values) == 0 {
-		current := profile.Permissions
+		current := account.Permissions
 		if field == "groups" {
-			current = profile.Groups
+			current = account.Groups
 		}
 		if len(current) == 0 {
 			fmt.Printf("%s has no %s\n", account.Name, field)
@@ -328,45 +334,49 @@ func setCMSField(ctx context.Context, store *authn.Store, args []string, field s
 		return nil
 	}
 
+	// Everything else about the account is carried over unchanged: the edit
+	// replaces an account wholesale, and this command is only about one field.
+	edit := auth.AccountEdit{
+		DisplayName: account.DisplayName,
+		Email:       account.Email,
+		Groups:      account.Groups,
+		Permissions: account.Permissions,
+		Disabled:    account.Disabled,
+	}
 	if field == "groups" {
-		profile.Groups = values
+		edit.Groups = values
 	} else {
-		profile.Permissions = values
+		edit.Permissions = values
 	}
-	if err := store.SetCMSProfile(ctx, account.ID, profile); err != nil {
-		return err
+
+	updated, err := admin.Update(ctx, name, edit)
+	if err != nil {
+		return named(name, err)
 	}
-	fmt.Printf("%s %s: %s\n", account.Name, field, strings.Join(values, ", "))
+	fmt.Printf("%s %s: %s\n", updated.Name, field, strings.Join(values, ", "))
 
 	// A name this build does not define is dropped when the scope is built, so
-	// it would look granted and grant nothing.
-	account.CMS = profile
-	if unknown := account.UnregisteredPermissions(); len(unknown) > 0 {
+	// it would look granted and grant nothing. Only for permissions: groups are
+	// matched against an entry's ACL and are not registered anywhere, so there is
+	// no such thing as an unknown one.
+	if field == "permissions" && len(updated.Unregistered) > 0 {
 		fmt.Printf("\nWarning: %d of these are not defined in this build and will grant nothing:\n  %s\n",
-			len(unknown), strings.Join(unknown, "\n  "))
+			len(updated.Unregistered), strings.Join(updated.Unregistered, "\n  "))
 	}
 	return nil
 }
 
-func listPasskeys(ctx context.Context, store *authn.Store, out io.Writer, args []string) error {
+func listPasskeys(ctx context.Context, admin *auth.Admin, out io.Writer, args []string) error {
 	name, err := firstArg(args, "an account name")
 	if err != nil {
 		return err
 	}
-	account, err := store.AccountByName(ctx, name)
-	if errors.Is(err, authn.ErrNoAccount) {
-		return fmt.Errorf("no active account named %q", name)
-	}
+	keys, err := admin.Passkeys(ctx, name)
 	if err != nil {
-		return err
-	}
-
-	keys, err := store.ListPasskeys(ctx, account.ID)
-	if err != nil {
-		return err
+		return named(name, err)
 	}
 	if len(keys) == 0 {
-		fmt.Fprintf(out, "%s has no passkeys\n", account.Name)
+		fmt.Fprintf(out, "%s has no passkeys\n", name)
 		return nil
 	}
 
@@ -380,7 +390,7 @@ func listPasskeys(ctx context.Context, store *authn.Store, out io.Writer, args [
 		// A syncable key predates the device-bound rule; registration refuses
 		// them now, so any that show here are worth replacing.
 		syncable := "no"
-		if k.BackupEligible {
+		if k.Syncable {
 			syncable = "YES — not device-bound"
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
@@ -396,54 +406,47 @@ func orDash(s string) string {
 	return s
 }
 
-func revokeCredentials(ctx context.Context, store *authn.Store, args []string) error {
+func revokeCredentials(ctx context.Context, admin *auth.Admin, args []string) error {
 	name, err := firstArg(args, "an account name")
 	if err != nil {
 		return err
 	}
-	account, err := store.AccountByName(ctx, name)
-	if errors.Is(err, authn.ErrNoAccount) {
-		return fmt.Errorf("no active account named %q", name)
-	}
+	revoked, err := admin.Revoke(ctx, name)
 	if err != nil {
-		return err
+		return named(name, err)
 	}
-
-	keys, err := store.DeletePasskeys(ctx, account.ID)
-	if err != nil {
-		return err
-	}
-	sessions, err := store.DeleteSessions(ctx, account.ID)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("removed %d passkey(s) and %d session(s) for %s\n", keys, sessions, account.Name)
+	fmt.Printf("removed %d passkey(s) and %d session(s) for %s\n",
+		revoked.Passkeys, revoked.Sessions, name)
 	return nil
 }
 
-func setDisabled(ctx context.Context, store *authn.Store, args []string, disabled bool) error {
+func setDisabled(ctx context.Context, admin *auth.Admin, args []string, disabled bool) error {
 	name, err := firstArg(args, "an account name")
 	if err != nil {
 		return err
 	}
-	id, err := store.SetDisabled(ctx, name, disabled)
+	account, err := admin.Get(ctx, name)
 	if err != nil {
-		if errors.Is(err, authn.ErrNoAccount) {
-			return fmt.Errorf("no account named %q", name)
-		}
-		return err
+		return named(name, err)
 	}
 
-	if !disabled {
-		fmt.Printf("%s enabled\n", name)
+	edit := auth.AccountEdit{
+		DisplayName: account.DisplayName,
+		Email:       account.Email,
+		Groups:      account.Groups,
+		Permissions: account.Permissions,
+		Disabled:    disabled,
+	}
+	if _, err := admin.Update(ctx, name, edit); err != nil {
+		return named(name, err)
+	}
+
+	if disabled {
+		// Updating drops the account's sessions as it disables it; loading
+		// already refuses a disabled account, so this only makes that explicit.
+		fmt.Printf("%s disabled, its sessions ended\n", name)
 		return nil
 	}
-	// Loading already refuses a disabled account, so its sessions are inert;
-	// dropping the rows makes that explicit rather than implied.
-	sessions, err := store.DeleteSessions(ctx, id)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("%s disabled, %d session(s) ended\n", name, sessions)
+	fmt.Printf("%s enabled\n", name)
 	return nil
 }

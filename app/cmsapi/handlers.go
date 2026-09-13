@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ihleven/ihlvn/pkg/authn"
+	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/mgmt"
 	"github.com/interhome-group/cms/mgmt/handler"
@@ -29,7 +29,7 @@ import (
 
 // contentUser is the user the CMS evaluates for a request.
 func contentUser(r *http.Request) content.User {
-	return authn.ContextUser(r.Context())
+	return auth.ContextUser(r.Context())
 }
 
 // EntryDetails returns a single entry by storage path.

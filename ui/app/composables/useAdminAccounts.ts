@@ -33,6 +33,9 @@ export type AdminPasskey = {
 export type PasswordAdvice = {
   length: number
   too_short: boolean
+  // The threshold too_short was measured against. Sent rather than assumed, so
+  // the sentence shown cannot disagree with the check that produced it.
+  min_length: number
   breaches: number
   unchecked?: string
 }
@@ -83,7 +86,9 @@ export function useAdminAccounts() {
       body: { password, confirm },
     })
 
-  const enroll = (name: string) =>
+  // issueLink, not enrol: usePasskey.enrol registers a device, this creates the
+  // link that lets someone do so. Two names for opposite ends of one flow.
+  const issueLink = (name: string) =>
     call<Enrollment>(`/${encodeURIComponent(name)}/enroll`, { method: 'POST' })
 
   const passkeys = (name: string) =>
@@ -114,7 +119,7 @@ export function useAdminAccounts() {
 
   return {
     list, areas, get, create, update,
-    setPassword, enroll,
+    setPassword, issueLink,
     passkeys, removePasskey, revoke, signOutEverywhere,
     describe,
   }

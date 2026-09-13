@@ -11,16 +11,22 @@
     <!-- The link is the way to onboard someone: they choose their own password
          as they register a device, so nothing has to be conveyed. -->
     <div>
-      <UButton variant="subtle" :loading="linking" @click="issueLink">
+      <UButton variant="subtle" :loading="linking" :disabled="!account.has_password" @click="issueLink">
         Einladungslink erzeugen
       </UButton>
+      <!-- Der Link ist der Besitz, das Passwort das Wissen. Ein Link für ein
+           Konto ohne Passwort wäre nur eins von beiden — wer ihn abfängt, hätte
+           das Konto. -->
+      <p v-if="!account.has_password" class="mt-2 text-xs text-gray-500">
+        Erst ein Passwort setzen. Es wird beim Registrieren abgefragt und muss
+        getrennt vom Link übermittelt werden.
+      </p>
       <div v-if="link" class="mt-3 rounded border border-gray-200 bg-gray-50 p-3">
         <p class="font-mono text-xs break-all">{{ link.url }}</p>
         <p class="mt-2 text-xs text-gray-500">
           Einmal gültig, bis {{ new Date(link.expires_at).toLocaleTimeString() }}.
-          {{ account.has_password
-            ? 'Das bestehende Passwort wird beim Registrieren abgefragt.'
-            : 'Das Passwort wird dabei selbst gewählt.' }}
+          Das Passwort wird beim Registrieren abgefragt — bitte getrennt vom Link
+          übermitteln.
         </p>
       </div>
     </div>
@@ -32,8 +38,8 @@
       <UButton type="submit" variant="subtle" :loading="settingPassword">Setzen</UButton>
     </form>
     <p class="-mt-4 text-xs text-gray-500">
-      Für den Notfall. Ein Passwort, das hier gesetzt wird, kennt die
-      Administration — der Einladungslink ist der bessere Weg.
+      Das erste Passwort und der Notfall. Wer es hier setzt, kennt es — deshalb
+      getrennt vom Einladungslink übermitteln, und danach änderbar.
     </p>
 
     <!-- Advice, not a verdict: the server reports what it found and sets
@@ -45,7 +51,7 @@
             Dieses Passwort taucht {{ advice.breaches }}× in bekannten Datenlecks auf.
           </li>
           <li v-if="advice.too_short">
-            {{ advice.length }} Zeichen; üblich sind 12 oder mehr.
+            {{ advice.length }} Zeichen; üblich sind {{ advice.min_length }} oder mehr.
           </li>
           <li v-if="advice.unchecked">
             Konnte nicht gegen bekannte Datenlecks geprüft werden.
@@ -136,7 +142,7 @@ async function run(flag: Ref<boolean>, work: () => Promise<string>) {
 
 function issueLink() {
   return run(linking, async () => {
-    link.value = await admin.enroll(props.account.name)
+    link.value = await admin.issueLink(props.account.name)
     return ''
   })
 }

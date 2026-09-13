@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ihleven/ihlvn/app/auth"
+	"github.com/ihleven/ihlvn/app/cmsauth"
 	"github.com/ihleven/ihlvn/app/db"
-	"github.com/ihleven/ihlvn/pkg/authn"
-	"github.com/ihleven/ihlvn/pkg/hiauth"
 	"github.com/interhome-group/cms/pkg/errs"
 )
 
@@ -17,12 +17,12 @@ import (
 //
 // Migrations run here rather than as a separate deployment step, so the binary
 // and the schema it expects cannot get out of step.
-func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags) (*authn.Service, error) {
-	if err := authn.Migrate(ctx, pg.Pool()); err != nil {
+func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags) (*auth.Service, error) {
+	if err := db.Migrate(ctx, pg.Pool()); err != nil {
 		return nil, fmt.Errorf("migrating the account database: %w", err)
 	}
 
-	return authn.New(authn.NewStore(pg.Pool()), authn.Config{
+	return auth.NewService(auth.NewStore(pg.Pool()), auth.Config{
 		CookieName:    flags.CookieName,
 		CookieSecure:  site.CookieSecure,
 		SameSite:      flags.CookieSameSite,
@@ -34,23 +34,9 @@ func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags) (*authn.S
 
 		RPID:      site.RPID,
 		RPOrigins: site.PasskeyOrigins,
-		// RPDisplayName is left to authn, which falls back to the relying party
+		// RPDisplayName is left to the passkey package, which falls back to the relying party
 		// id — so the name a browser shows follows the domain automatically.
 	}, slog.Default())
-}
-
-// hiDriveTokens adapts the HiDrive token manager to what a handler asks for:
-// given an account's alias, an access token to use upstream.
-type hiDriveTokens struct {
-	mngr *hiauth.TokenMngr
-}
-
-func (h hiDriveTokens) AccessToken(alias string) (string, error) {
-	refresher := h.mngr.GetTokenRefresher(alias)
-	if refresher == nil {
-		return "", fmt.Errorf("no HiDrive token stored for alias %q", alias)
-	}
-	return refresher.GetAccessToken()
 }
 
 // authenticator is the whole of what these wrappers need from the auth service:
@@ -60,7 +46,7 @@ func (h hiDriveTokens) AccessToken(alias string) (string, error) {
 // it decides — whether an entitlement admits a request — is worth a test, and
 // tying that to a live session store would mean testing cookie parsing instead.
 type authenticator interface {
-	Authenticate(*http.Request) (*authn.Account, bool)
+	Authenticate(*http.Request) (*auth.Account, bool)
 }
 
 // requireAccount refuses a request without an account and hands the account to
@@ -69,14 +55,14 @@ type authenticator interface {
 // It reports the refusal as an error rather than writing the response itself, so
 // the router's error middleware renders and logs it like any other failure.
 // These are API routes, so a browser redirect would be the wrong answer anyway;
-// authn.Require is the middleware for routes that a person navigates to.
+// auth.Require is the middleware for routes that a person navigates to.
 func requireAccount(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		account, ok := svc.Authenticate(r)
 		if !ok {
 			return errs.New("authentication required", errs.HTTPStatus(http.StatusUnauthorized))
 		}
-		return h(w, r.WithContext(authn.WithAccount(r.Context(), account)))
+		return h(w, r.WithContext(auth.WithAccount(r.Context(), account)))
 	}
 }
 
@@ -85,7 +71,7 @@ func requireAccount(svc authenticator, h func(http.ResponseWriter, *http.Request
 func optionalAccount(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		if account, ok := svc.Authenticate(r); ok {
-			r = r.WithContext(authn.WithAccount(r.Context(), account))
+			r = r.WithContext(auth.WithAccount(r.Context(), account))
 		}
 		return h(w, r)
 	}
@@ -101,8 +87,8 @@ func optionalAccount(svc authenticator, h func(http.ResponseWriter, *http.Reques
 // signed in means.
 func requireAdmin(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return requireAccount(svc, func(w http.ResponseWriter, r *http.Request) error {
-		account, ok := authn.FromContext(r.Context())
-		if !ok || account.ContentUser().Scope.Denies(permAdmin) {
+		account, ok := auth.FromContext(r.Context())
+		if !ok || !cmsauth.May(account, cmsauth.Admin) {
 			return errs.New("administration requires the admin entitlement",
 				errs.HTTPStatus(http.StatusForbidden))
 		}

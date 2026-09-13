@@ -1,109 +1,92 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/ihleven/ihlvn/app/db"
-	"github.com/ihleven/ihlvn/pkg/hiauth"
+	"github.com/ihleven/ihlvn/app/hidrive"
 )
 
-// HiDrive token inspection.
+// Reporting on the storage connection.
 //
-// A refresh token is the only credential the app cannot obtain for itself: when
-// HiDrive rejects one, storage access stops until a person redoes the consent
-// flow. This reports what is stored and, on request, whether HiDrive still
-// accepts it — which the server's log otherwise only reveals at startup.
+// What is stored, and whether the provider still accepts it, is app/hidrive's to
+// answer. What is here is a table and a sentence about what to do next.
 
 type HiTokenCmd struct {
 	Check bool `arg:"--check" help:"ask HiDrive whether each stored token still works (one request per alias)"`
 }
 
 func (c *HiTokenCmd) Run(flags Flags) error {
+	// The check talks to HiDrive once per alias, so this is generous rather
+	// than instant.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	pg, err := db.New(flags.DbConn)
 	if err != nil {
 		return fmt.Errorf("connecting to %s: %w", flags.DbConn, err)
 	}
 	defer pg.Close()
 
-	tokens, err := pg.LoadTokens()
-	if err != nil {
-		return fmt.Errorf("reading hitoken: %w", err)
+	// As the account commands do: a command can never talk to a schema the
+	// binary does not expect, and on a fresh database the alternative is a bare
+	// "relation hitoken does not exist".
+	if err := db.Migrate(ctx, pg.Pool()); err != nil {
+		return err
 	}
-	if len(tokens) == 0 {
+
+	statuses, err := hidrive.InspectTokens(ctx, hidrive.NewStore(pg.Pool()),
+		flags.HidriveClientID, flags.HidriveClientSecret, c.Check)
+	if err != nil {
+		return err
+	}
+	if len(statuses) == 0 {
 		return errors.New("no rows in hitoken: authorise an alias at /apihle/auth/authorize first")
 	}
-
-	return reportHiTokens(tokens, c.Check, flags, os.Stdout)
+	return reportHiTokens(statuses, flags.PublicURL, os.Stdout)
 }
 
-func reportHiTokens(tokens []map[string]string, check bool, flags Flags, out io.Writer) error {
+func reportHiTokens(statuses []hidrive.TokenStatus, publicURL string, out io.Writer) error {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ALIAS\tSCOPE\tLENGTH\tSTORED\tEXPIRES_AT\tSTATUS")
 
 	var failed int
-
-	for _, t := range tokens {
-		refresh := t["refresh_token"]
-
-		status := "not checked"
-		if check {
-			status = checkHiToken(flags, refresh)
-			if !strings.HasPrefix(status, "ok") {
-				failed++
-			}
+	for _, s := range statuses {
+		if s.Checked && !s.Accepted {
+			failed++
 		}
-
-		// A token that round-trips through an editor or a paste can arrive with
-		// whitespace, which HiDrive rejects exactly as it rejects a dead one —
-		// so the stored shape is worth seeing next to the verdict.
-		stored := "clean"
-		switch {
-		case refresh == "":
-			stored = "EMPTY"
-		case strings.TrimSpace(refresh) != refresh:
-			stored = "HAS WHITESPACE"
-		}
-
 		fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n",
-			t["alias"], t["scope"], len(refresh), stored, t["expires_at"], status)
+			s.Alias, s.Scope, s.Length, s.Stored, s.ExpiresAt, verdict(s))
 	}
-
 	if err := w.Flush(); err != nil {
 		return err
 	}
 
 	if failed > 0 {
 		fmt.Fprintf(out, "\n%d of %d rejected. Re-authorise at %s/apihle/auth/authorize as the same HiDrive\naccount, then restart the server — refreshers read this table only at startup.\n",
-			failed, len(tokens), strings.TrimSuffix(flags.PublicURL, "/"))
+			failed, len(statuses), strings.TrimSuffix(publicURL, "/"))
 	}
-
 	return nil
 }
 
-// checkHiToken asks HiDrive whether one refresh token still works. The answer is
-// the same exchange the server makes, so a token that passes here is one the
-// server can use.
-func checkHiToken(flags Flags, refresh string) string {
-	mngr := hiauth.NewTokenChecker(flags.HidriveClientID, flags.HidriveClientSecret)
-
-	token, err := mngr.RefreshToken(refresh)
-	if err != nil {
-		var oauthErr *hiauth.OAuthError
-		if errors.As(err, &oauthErr) {
-			if oauthErr.Permanent() {
-				return "REJECTED: " + oauthErr.Desc
-			}
-
-			return "error (retryable): " + oauthErr.Desc
-		}
-
-		return "error: " + err.Error()
+// verdict puts one status into a column. Permanent and retryable read
+// differently on purpose: only the first is a job for a person.
+func verdict(s hidrive.TokenStatus) string {
+	switch {
+	case !s.Checked:
+		return "not checked"
+	case s.Accepted:
+		return "ok (" + s.Detail + ")"
+	case s.Permanent:
+		return "REJECTED: " + s.Detail
+	default:
+		return "error (retryable): " + s.Detail
 	}
-
-	return fmt.Sprintf("ok (access token for %ds)", token.ExpiresIn)
 }

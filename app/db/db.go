@@ -19,11 +19,12 @@ func New(conn string) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{ctx: context.Background(), pool: dbpool}, nil
+	return &DB{pool: dbpool}, nil
 }
 
+// DB is the connection, and nothing else: it opens a pool, hands it out and
+// closes it. Queries belong to the package that owns the tables they touch.
 type DB struct {
-	ctx  context.Context
 	pool *pgxpool.Pool
 }
 
@@ -43,9 +44,10 @@ func (db *DB) Pool() *pgxpool.Pool {
 // 	LoadBilder(where map[string]interface{}, serienbilder bool, deleted bool, orderBy string) ([]Bild2, error)
 // }
 
-func (r *DB) Select(dst interface{}, query string, args ...interface{}) error {
-
-	err := pgxscan.Select(r.ctx, r.pool, dst, query, args...)
+// Select scans rows into dst. The context is a parameter rather than a field on
+// DB: it belongs to the call, so a caller that gives up can say so.
+func (r *DB) Select(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+	err := pgxscan.Select(ctx, r.pool, dst, query, args...)
 	if err != nil {
 		// if errors.As(err, &pgx.ErrNoRows) {
 		// 	return errors.NewWithCode(errors.NotFound, "Not found: %s", query)

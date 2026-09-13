@@ -31,7 +31,7 @@ func NewTokenMngr(store TokenStore) *TokenMngr {
 		authclient: authclient{http.DefaultClient, os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET")},
 		TokenStore: store,
 	}
-	tokens, err := store.LoadTokens()
+	tokens, err := store.LoadTokens(mngr.ctx)
 	if err != nil {
 		log.Fatal("could not load tokens:", err.Error())
 	}
@@ -317,7 +317,9 @@ func (m *TokenMngr) RefreshToken(refreshtoken string) (*Token, error) {
 	return nil, &OAuthError{Code: errResp.Err, Desc: errResp.Desc}
 }
 
+// TokenStore is where refresh tokens live. Each call takes a context because
+// they are database calls: a request that goes away should not leave one running.
 type TokenStore interface {
-	LoadTokens() ([]map[string]string, error)
-	StoreToken(token *Token) error
+	LoadTokens(ctx context.Context) ([]map[string]string, error)
+	StoreToken(ctx context.Context, token *Token) error
 }

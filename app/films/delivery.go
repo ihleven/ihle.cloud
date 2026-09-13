@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ihleven/ihlvn/pkg/authn"
+	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/ihleven/ihlvn/pkg/blob"
 	"github.com/ihleven/ihlvn/pkg/stream"
 	"github.com/interhome-group/cms/content"
@@ -102,7 +102,7 @@ func lookup(mngr *mgmt.Mngr, ctx context.Context, id string) (*content.Entry, er
 
 	// Delivery wants the entry's own fields, so references are left unresolved:
 	// nothing here follows a link.
-	entry, err := mngr.GetEntry(path, authn.ContextUser(ctx), content.RSLV_NONE)
+	entry, err := mngr.GetEntry(path, auth.ContextUser(ctx), content.RSLV_NONE)
 	if err != nil {
 		switch errs.StatusOf(err) {
 		case http.StatusNotFound, http.StatusForbidden, http.StatusUnauthorized:
