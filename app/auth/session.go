@@ -32,6 +32,40 @@ func (s *Service) setSessionCookie(w http.ResponseWriter, token string) {
 		Secure:   s.cfg.CookieSecure,
 		SameSite: s.cfg.SameSite,
 	})
+	s.rememberBrowser(w)
+}
+
+// KnownCookie marks a browser that has signed in here at least once.
+//
+// The front page shows the pool and nothing else by default: this app's
+// audience and the pool's overlap only partly, and someone who came for the
+// tipping should not be met by a sign-in for an account they do not have. This
+// cookie is how a browser that has been here before gets its way back.
+//
+// It is not a security measure and must not be mistaken for one. It is readable
+// by any script — it has to be, because a signed-out visitor gets 401 from the
+// session endpoint, so the page itself has to decide — and it is therefore
+// trivially forged. All it can reveal is a link that anyone reaches by typing
+// the path; every route behind it still requires a session.
+const KnownCookie = "ihlvn_known"
+
+// knownTTL outlives any session on purpose: the point is to be remembered after
+// signing out, and on a browser used a few times a year.
+const knownTTL = 5 * 365 * 24 * time.Hour
+
+// rememberBrowser is set wherever a session begins, so no future way of signing
+// in can forget it. Signing out deliberately leaves it: being remembered is
+// what it is for.
+func (s *Service) rememberBrowser(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     KnownCookie,
+		Value:    "1",
+		Path:     "/",
+		Expires:  time.Now().Add(knownTTL),
+		HttpOnly: false,
+		Secure:   s.cfg.CookieSecure,
+		SameSite: s.cfg.SameSite,
+	})
 }
 
 func (s *Service) clearCookie(w http.ResponseWriter, name string) {

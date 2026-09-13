@@ -10,6 +10,7 @@ const areas = [
   { module: 'filme', icon: 'i-lucide-clapperboard', label: 'Filme', to: '/filme' },
   { module: 'familie', icon: 'i-lucide-users', label: 'Familie', to: '/famihlie' },
   { module: 'kalender', icon: 'i-lucide-calendar', label: 'Kalender', to: '/kalender' },
+  { module: 'hidrive', icon: 'i-lucide-hard-drive', label: 'Dateien', to: '/hidrive' },
   { module: 'mediathek', icon: 'i-lucide-library', label: 'Mediathek', to: '/mediathek' },
   { module: 'musik', icon: 'i-lucide-music', label: 'Musik', to: '/musik' },
   { module: 'search', icon: 'i-feather-search', label: 'Search', to: '/search' },

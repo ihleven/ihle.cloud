@@ -47,10 +47,36 @@ func (s *Service) sessionResponse(a *Account, expires time.Time) sessionResponse
 		NotBefore:   now.Unix(),
 		IssuedAt:    now.Unix(),
 		Permissions: permissions,
-		Modules:     cmsauth.Entitled(a),
+		Modules:     s.offered(a),
 		Name:        a.DisplayName,
 		Email:       a.Email,
 	}
+}
+
+// offered is the areas the frontend may put in front of this account.
+//
+// Entitlement is nearly all of it, and for every area but one it is all of it.
+// Browsing the storage additionally needs storage: an account that names no
+// drive and a deployment that configures no shared one leave nothing to browse,
+// and an entry that leads to an error is worse than no entry. So the area is
+// withheld, which is indistinguishable from not being entitled — which is what
+// someone in that position should see.
+//
+// The server still refuses the endpoints on the entitlement alone. This decides
+// what to offer, not what is allowed.
+func (s *Service) offered(a *Account) []string {
+	entitled := cmsauth.Entitled(a)
+	if a.HiDrive.Alias != "" || s.cfg.SharedDrive {
+		return entitled
+	}
+
+	offered := make([]string, 0, len(entitled))
+	for _, id := range entitled {
+		if id != cmsauth.HidriveArea {
+			offered = append(offered, id)
+		}
+	}
+	return offered
 }
 
 // Login verifies a password and starts a session.

@@ -12,6 +12,10 @@ import (
 	"github.com/interhome-group/cms/pkg/errs"
 )
 
+// userAgent identifies this app to the pool's host, which answers Go's default
+// with a 403.
+const userAgent = "ihlvn"
+
 // TokenCookie is the name the pool's backend looks for. It reads the JWT from
 // this cookie and from nowhere else — an Authorization header is ignored — so
 // the name is part of the upstream's contract, not a choice.
@@ -52,17 +56,34 @@ func Login(upstream string, secure bool, prefix string) (func(http.ResponseWrite
 			"password": {r.PostForm.Get("password")},
 		}
 
-		resp, err := http.Post(endpoint, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+		request, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint,
+			strings.NewReader(form.Encode()))
+		if err != nil {
+			return errs.Wrap(err, "building the sign-in request", errs.HTTPStatus(http.StatusInternalServerError))
+		}
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		// Named, because the pool's host refuses Go's default User-Agent with a
+		// 403 — which arrives here as "wrong login or password" and sends
+		// whoever is signing in to check a password that was never the problem.
+		request.Header.Set("User-Agent", userAgent)
+
+		resp, err := http.DefaultClient.Do(request)
 		if err != nil {
 			return errs.Wrap(err, "the geheimtipp backend did not answer", errs.HTTPStatus(http.StatusBadGateway))
 		}
 		defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			// Whatever upstream thought of the credentials, said in its own
-			// words would be its own words — a bare status reads better and
-			// leaks less about which half was wrong.
+		// Only 401 is reported as a refusal of the credentials. Anything else is
+		// the pool being unreachable or unhappy with the request — 403 is what
+		// its host answers a request it will not serve at all — and saying
+		// "wrong password" to that sends someone to fix the one thing that was
+		// never broken.
+		if resp.StatusCode == http.StatusUnauthorized {
 			return errs.New("wrong login or password", errs.HTTPStatus(http.StatusUnauthorized))
+		}
+		if resp.StatusCode != http.StatusOK {
+			return errs.New("the geheimtipp backend refused the sign-in (%d)", resp.StatusCode,
+				errs.HTTPStatus(http.StatusBadGateway))
 		}
 
 		var answer struct {

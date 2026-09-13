@@ -9,6 +9,9 @@ This file starts here; anything before the entries below is only in the git hist
 
 ### Added
 
+- **The files on HiDrive can be browsed in the app**: folders and their contents, with the size, dimensions and date of each entry, a trail back up, and the pictures of a folder shown as pictures rather than as a list of filenames. A single file can be looked at and downloaded. It is its own area, so it appears only for an account that has been given it — having storage configured is not by itself permission to go through it, and an account that has been given the area but has no storage of its own is shown the family's.
+
+
 - **The football pool is served from here**: Geheimtipp — the tipping pool that has lived at ihleven.de — is now rendered by this app: the current matchdays, a matchday's tip matrix with every tipper side by side, the day's and the overall standings, the league table, the list of matchdays, and the ranking with everyone's avatar and motto. The tips themselves still live in the pool's own database; only the pages are new.
 
 - **Tips can be placed again**: on a matchday, your own column is typeable until each match kicks off — every other column stays as it is, and a match whose kick-off has passed stops taking anything. One *Abschicken* sends the whole matchday at once, and the pool answers per match, so tips it takes are kept even when one of them comes too late. A single match can also be tipped on its own page, with the same up-and-down buttons the pool has always had.

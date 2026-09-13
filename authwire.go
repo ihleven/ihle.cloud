@@ -10,6 +10,7 @@ import (
 	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/ihleven/ihlvn/app/cmsauth"
 	"github.com/ihleven/ihlvn/app/db"
+	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/pkg/errs"
 )
 
@@ -31,6 +32,10 @@ func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags) (*auth.Se
 		Audience:      "famihlie",
 		FailureLimit:  10,
 		FailureWindow: 15 * time.Minute,
+
+		// Whether an account with no drive of its own still has something to
+		// browse, which is what decides if the file browser is offered at all.
+		SharedDrive: flags.MediaAlias != "",
 
 		RPID:      site.RPID,
 		RPOrigins: site.PasskeyOrigins,
@@ -77,21 +82,33 @@ func optionalAccount(svc authenticator, h func(http.ResponseWriter, *http.Reques
 	}
 }
 
-// requireAdmin refuses a request whose account is not entitled to the admin
-// area, and hands the account to the handler as requireAccount does.
+// requireModule refuses a request whose account is not entitled to an area, and
+// hands the account to the handler as requireAccount does.
 //
 // The entitlement is checked here rather than trusted from the client: the
-// navigation hides areas an account may not see, but that is presentation, and
-// these endpoints can rename an account, grant it rights or set its password.
+// navigation hides areas an account may not see, but that is presentation.
 // Composed from requireAccount so there is one place that decides what being
 // signed in means.
-func requireAdmin(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+//
+// Most areas never reach this — they are offered in a menu and nothing more.
+// It is for the ones where the area is the access decision itself.
+func requireModule(svc authenticator, key content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return requireAccount(svc, func(w http.ResponseWriter, r *http.Request) error {
 		account, ok := auth.FromContext(r.Context())
-		if !ok || !cmsauth.May(account, cmsauth.Admin) {
-			return errs.New("administration requires the admin entitlement",
-				errs.HTTPStatus(http.StatusForbidden))
+		if !ok || !cmsauth.May(account, key) {
+			return errs.New("%s", refusal, errs.HTTPStatus(http.StatusForbidden))
 		}
 		return h(w, r)
 	})
+}
+
+// requireAdmin gates account administration, which can rename an account, grant
+// it rights or set its password.
+func requireAdmin(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return requireModule(svc, cmsauth.Admin, "administration requires the admin entitlement", h)
+}
+
+// requireHidrive gates browsing the family's storage.
+func requireHidrive(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return requireModule(svc, cmsauth.Hidrive, "browsing the files requires the hidrive entitlement", h)
 }

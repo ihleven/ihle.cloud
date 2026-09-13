@@ -20,7 +20,6 @@ import (
 	"github.com/ihleven/ihlvn/app/films"
 	"github.com/ihleven/ihlvn/app/geheimtipp"
 	"github.com/ihleven/ihlvn/app/hidrive"
-	"github.com/ihleven/ihlvn/app/media"
 	"github.com/ihleven/ihlvn/pkg/blob"
 	"github.com/ihleven/ihlvn/pkg/cmd"
 	"github.com/ihleven/ihlvn/pkg/mail"
@@ -65,6 +64,7 @@ type Flags struct {
 	// Browsing is the other case, and takes its drive from the session.
 	MediaAlias  string `arg:"--media-alias, env:MEDIA_ALIAS" placeholder:"ALIAS" help:"HiDrive alias media is delivered from. Unset disables the media route"`
 	MediaRoot   string `arg:"--media-root,  env:MEDIA_ROOT"  placeholder:"PATH"  help:"directory media keys resolve against. Nothing outside it can be addressed"`
+	DriveRoot   string `arg:"--drive-root,  env:DRIVE_ROOT"  placeholder:"PATH"  default:"/public" help:"directory the file browser falls back to for an account with no drive of its own. Deliberately not the media root, which is where film keys resolve"`
 	DataDir     string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
 	SearchLevel string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
 	SearchDir   string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
@@ -201,6 +201,12 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		filmstore, filmthumbs = blob.NewStatCache(drive.Blobs(), 0), drive
 	}
 
+	// Browsing the storage. The deployment's alias stands in for an entitled
+	// account that names none of its own, so the entitlement alone is enough to
+	// have something to look at — rooted at DriveRoot rather than at the media
+	// root, so the fallback is the shared material and not the film store.
+	drives := hidrive.NewAPI(hitokens, hidrive.Shared{Alias: flags.MediaAlias, Root: flags.DriveRoot})
+
 	authsvc, err := openAuth(context.Background(), pg, site, flags)
 	if err != nil {
 		log.Fatal("openAuth: ", err)
@@ -285,9 +291,12 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/films/{id}/poster.jpg", requireAccount(authsvc, films.Poster(cms, filmthumbs))),
 		route("  GET  /api/v1/films/{id}/chapters.vtt", requireAccount(authsvc, films.ChapterTrack(cms))),
 
-		// An asset is addressed by its path in the viewer's own drive, which is
-		// the browsing case rather than the delivery one.
-		route("  GET  /api/v1/proxy/{path...}", requireAccount(authsvc, media.Proxy(hitokens))),
+		// The file browser. Gated on the entitlement rather than on merely being
+		// signed in, because the entitlement is what decides that someone may
+		// browse at all — see app/drive.
+		route("  GET  /api/v1/drive/meta/{path...}  ", requireHidrive(authsvc, drives.Meta)),
+		route("  GET  /api/v1/drive/media/{path...} ", requireHidrive(authsvc, drives.Media)),
+		route("  GET  /api/v1/drive/thumb           ", requireHidrive(authsvc, drives.Thumbnail)),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),

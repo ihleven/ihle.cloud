@@ -61,6 +61,15 @@ type Config struct {
 	ChallengeTTL   time.Duration
 	EnrollTTL      time.Duration
 	CeremonyCookie string
+
+	// SharedDrive says whether the deployment configured storage that an account
+	// with none of its own falls back to.
+	//
+	// It is here because the session reports which areas the frontend may offer,
+	// and an area whose whole content is a drive has nothing to offer without
+	// one. Held as a bool rather than as the alias: what this decides is whether
+	// there is anything to browse, not what.
+	SharedDrive bool
 }
 
 // Service is the use-case and HTTP half. Store is the persistence half; nothing

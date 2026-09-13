@@ -122,3 +122,44 @@ func TestLoginNeedsAUsableUpstream(t *testing.T) {
 		t.Error("an upstream with no scheme was accepted")
 	}
 }
+
+// A request the pool's host will not serve — it answers 403 to some clients
+// regardless of credentials — must not be reported as a wrong password. Saying
+// so sends whoever is signing in to check the one thing that is not broken.
+func TestARefusedRequestIsNotReportedAsAWrongPassword(t *testing.T) {
+	for _, status := range []int{http.StatusForbidden, http.StatusBadGateway, http.StatusNotFound} {
+		up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(status)
+		}))
+
+		login, _ := Login(up.URL, false, "/ght")
+		_, err := post(t, login, url.Values{"username": {"paul"}, "password": {"secret"}})
+		if err == nil {
+			t.Fatalf("upstream %d was accepted", status)
+		}
+		if strings.Contains(err.Error(), "wrong login or password") {
+			t.Errorf("upstream %d was reported as a wrong password: %v", status, err)
+		}
+		up.Close()
+	}
+}
+
+// The pool's host answers Go's default User-Agent with a 403, so the request
+// has to name itself.
+func TestTheRequestNamesItself(t *testing.T) {
+	seen := make(chan string, 1)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.Header.Get("User-Agent")
+		_ = json.NewEncoder(w).Encode(map[string]string{"Username": "paul", "JWT": "j"})
+	}))
+	defer up.Close()
+
+	login, _ := Login(up.URL, false, "/ght")
+	if _, err := post(t, login, url.Values{"username": {"paul"}, "password": {"secret"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := <-seen; got != userAgent {
+		t.Errorf("User-Agent = %q, want %q", got, userAgent)
+	}
+}

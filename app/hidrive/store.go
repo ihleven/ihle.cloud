@@ -1,11 +1,16 @@
 // Package hidrive is the storage provider's half of the app: the OAuth tokens
-// that let it read a HiDrive account.
+// that let it read a HiDrive account, and what a person may see of one.
 //
-// These lived with the account tables, which put a third party's credentials in
-// the authentication schema and made the auth package responsible for something that has
-// nothing to do with who anyone is. The rows stay where they are — an applied
-// migration is pinned by a checksum of its text and cannot be rewritten — but
-// the code that owns them is here.
+// The tokens lived with the account tables, which put a third party's
+// credentials in the authentication schema and made the auth package
+// responsible for something that has nothing to do with who anyone is. The rows
+// stay where they are — an applied migration is pinned by a checksum of its text
+// and cannot be rewritten — but the code that owns them is here.
+//
+// Browsing (browse.go) is here rather than in a package of its own because it is
+// not separable: it hands back hi.Meta, it is configured in aliases and roots,
+// and it holds an *hi.Drive. A package named for a provider-neutral idea would
+// have promised a seam that nothing behind it could honour.
 package hidrive
 
 import (

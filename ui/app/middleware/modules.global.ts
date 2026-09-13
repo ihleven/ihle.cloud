@@ -10,6 +10,7 @@ const AREA_BY_PREFIX: Record<string, string> = {
   '/filme': 'filme',
   '/entries': 'content',
   '/famihlie': 'familie',
+  '/hidrive': 'hidrive',
   '/kalender': 'kalender',
   '/mediathek': 'mediathek',
   '/musik': 'musik',

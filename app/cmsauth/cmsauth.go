@@ -29,11 +29,33 @@ func init() {
 	modules.Define("filme", "Die Super-8-Filme.")
 	modules.Define("content", "Der Inhalts-Editor.")
 	modules.Define("familie", "Stammbaum und Personen.")
+	// Offering the pool, not admitting anyone to it: geheimtipp is a separate
+	// site with its own users and its own sign-in, and this app's entitlements
+	// have no standing there. Deliberately absent from the route guard, so an
+	// account without it is simply not shown the link and is not blocked from
+	// following one.
+	modules.Define("geheimtipp", "Die Tipprunde.")
 	modules.Define("kalender", "Der Kalender.")
 	modules.Define("mediathek", "Die Mediathek.")
 	modules.Define("musik", "Die Musik.")
 	modules.Define("search", "Die Suche.")
 }
+
+// Hidrive gates browsing the family's storage.
+//
+// Held as a key rather than only defined, for the same reason as Admin: it is
+// checked on the server, not merely offered in a menu. It decides *whether*
+// someone may browse; which drive they land in is the account's HiDrive alias,
+// or the deployment's when the account names none. Keeping the two apart is
+// what stops an alias configured for some other purpose from quietly handing
+// out a file browser.
+var Hidrive = modules.Define(HidriveArea, "Die Dateien auf HiDrive.")
+
+// HidriveArea is the area's id, as the session reports it. Named because the
+// session withholds this one area from an account that has no storage to
+// browse, and comparing against a literal there would be a second place to keep
+// the spelling right.
+const HidriveArea = "hidrive"
 
 // Admin gates account administration.
 //

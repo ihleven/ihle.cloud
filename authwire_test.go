@@ -97,3 +97,65 @@ func TestRequireAdminRefusesAnonymously(t *testing.T) {
 		t.Errorf("status = %d, want 401", status)
 	}
 }
+
+// The file browser is gated the same way, and for the same reason: the
+// entitlement is the access decision, not a menu entry. An account with an
+// alias configured for some other purpose — delivering films, say — must not
+// reach the browser through it.
+func TestRequireHidrive(t *testing.T) {
+	tests := []struct {
+		name        string
+		permissions []string
+		wantStatus  int
+		wantReached bool
+	}{{
+		name: "an account holding the hidrive entitlement", permissions: []string{"module.hidrive"},
+		wantStatus: http.StatusOK, wantReached: true,
+	}, {
+		name: "a superuser", permissions: []string{"*"},
+		wantStatus: http.StatusOK, wantReached: true,
+	}, {
+		name:        "an account entitled to the media library but not the files",
+		permissions: []string{"module.mediathek"}, wantStatus: http.StatusForbidden,
+	}, {
+		name: "an account entitled to nothing", permissions: nil,
+		wantStatus: http.StatusForbidden,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			account := &auth.Account{
+				Name: "someone",
+				CMS:  auth.CMSProfile{Permissions: tt.permissions},
+			}
+			// A drive configured on the account is deliberately present in every
+			// case: having one is not what decides this.
+			account.HiDrive.Alias = "matt.ihle"
+
+			reached := false
+			h := requireHidrive(signedInAs{account}, func(w http.ResponseWriter, _ *http.Request) error {
+				reached = true
+				w.WriteHeader(http.StatusOK)
+				return nil
+			})
+
+			err := h(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/drive/meta/", nil))
+
+			if reached != tt.wantReached {
+				t.Errorf("handler reached = %v, want %v", reached, tt.wantReached)
+			}
+			if tt.wantStatus == http.StatusOK {
+				if err != nil {
+					t.Fatalf("an entitled account was refused: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("the request was allowed through")
+			}
+			if status := errs.StatusOf(err); status != tt.wantStatus {
+				t.Errorf("status = %d, want %d", status, tt.wantStatus)
+			}
+		})
+	}
+}
