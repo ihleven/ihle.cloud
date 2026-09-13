@@ -18,6 +18,7 @@ import (
 	"github.com/ihleven/ihlvn/app/cmsapi"
 	"github.com/ihleven/ihlvn/app/db"
 	"github.com/ihleven/ihlvn/app/films"
+	"github.com/ihleven/ihlvn/app/geheimtipp"
 	"github.com/ihleven/ihlvn/app/hidrive"
 	"github.com/ihleven/ihlvn/app/media"
 	"github.com/ihleven/ihlvn/pkg/blob"
@@ -50,6 +51,13 @@ type Flags struct {
 	HidriveClientID     string `arg:"--hidrive-client-id,     env:CLIENT_ID"        placeholder:"ID"`
 	HidriveClientSecret string `arg:"--hidrive-client-secret, env:CLIENT_SECRET"    placeholder:"SECRET"`
 	RepoContent         string `arg:"                         env:REPO_CONTENT"     placeholder:"URL" `
+
+	// The geheimtipp backend: a separate running service with its own database.
+	// Deliberately its own /api/v1, not the /api the old frontend exposes —
+	// that one is served by that frontend's node layer, which goes away with
+	// it. Not a constant, or after the domain moves the proxy would call itself.
+	GeheimtippAPI   string `arg:"--ght-api,   env:GHT_API"   default:"https://ihleven.de/api/v1" placeholder:"URL"`
+	GeheimtippMedia string `arg:"--ght-media, env:GHT_MEDIA" default:"https://ihleven.de/media" placeholder:"URL"`
 
 	// The HiDrive account media is delivered from. Delivery is not per-viewer:
 	// a film lives in one place, and the same entry has to resolve to the same
@@ -206,6 +214,15 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 
 	fapi := familie.NewApi(cms.Repo, cms.Engine)
 
+	ghtAPI, err := geheimtipp.Proxy(flags.GeheimtippAPI, "/ght")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ghtMedia, err := geheimtipp.Proxy(flags.GeheimtippMedia, "/ght/media")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// The enrollment link's lifetime matches the CLI's default: long enough to
 	// hand over, short enough that a link left in a chat log stops working.
 	admin := auth.NewAdminAPI(auth.NewAdmin(auth.NewStore(pg.Pool()), site.Origin, 15*time.Minute, flags.MinPasswordLength))
@@ -269,6 +286,12 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
+
+		// The geheimtipp pool's own backend, under this origin so a browser may
+		// reach it. Ungated: what it forwards to is public, and so are the pages
+		// that use it. See app/geheimtipp for why this exists and when it goes.
+		route("      /ght/media/{path...}  ", ghtMedia),
+		route("      /ght/{path...}        ", ghtAPI),
 
 		// Account administration. Everything here is gated on the admin
 		// entitlement rather than on being signed in: these endpoints can grant

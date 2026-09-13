@@ -12,7 +12,9 @@ export default defineNuxtConfig({
   // A relative path while the layer is still moving, mirroring how go.mod
   // already depends on the same checkout. Switching to a git reference later is
   // a one-line change.
-  extends: ['../../cms/ui/layers/entry'],
+  // The geheimtipp pool, which is a public site with its own backend rather
+  // than an area of this app — see ui/layers/geheimtipp.
+  extends: ['../../cms/ui/layers/entry', './layers/geheimtipp'],
 
   modules: [
     '@nuxt/eslint',
@@ -93,6 +95,12 @@ export default defineNuxtConfig({
       // What the entry layer reads. Relative like everything else here, so the
       // app calls whichever origin served it, with this app's own API prefix.
       apiBaseURL: '/api/v1',
+
+      // Where the geheimtipp pages fetch from. It is this app's proxy today,
+      // because the pool's own API is on another origin and cannot be called
+      // across it. Configuration rather than a constant, so moving to the same
+      // origin as the pool later is this one value, not a rewrite.
+      geheimtippBase: '/ght',
     },
   },
 
