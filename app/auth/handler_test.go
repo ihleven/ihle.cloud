@@ -1,11 +1,8 @@
 package auth
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"slices"
 	"testing"
-	"time"
 )
 
 // The file browser is the one area whose content is a drive, so being entitled
@@ -48,42 +45,5 @@ func TestTheFileBrowserIsOnlyOfferedWhenThereIsADriveToBrowse(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// Being remembered is what lets a browser find its way back to a front page
-// that otherwise shows only the pool. It is set wherever a session begins, so
-// a second way of signing in cannot forget it, and signing out leaves it alone.
-func TestSigningInRemembersTheBrowser(t *testing.T) {
-	s := &Service{cfg: Config{CookieName: "session", SessionTTL: time.Hour}}
-
-	w := httptest.NewRecorder()
-	s.setSessionCookie(w, "token")
-
-	var known *http.Cookie
-	for _, c := range w.Result().Cookies() {
-		if c.Name == KnownCookie {
-			known = c
-		}
-	}
-	if known == nil {
-		t.Fatal("signing in did not remember the browser")
-	}
-	// Readable by scripts on purpose: a signed-out visitor gets 401 from the
-	// session endpoint, so the page has to read this itself.
-	if known.HttpOnly {
-		t.Error("the marker is HttpOnly and the page could not read it")
-	}
-	if known.Expires.Before(time.Now().Add(4 * 365 * 24 * time.Hour)) {
-		t.Errorf("marker expires %v, want years out", known.Expires)
-	}
-
-	// Signing out ends the session and leaves the marker.
-	w = httptest.NewRecorder()
-	s.clearCookie(w, s.cfg.CookieName)
-	for _, c := range w.Result().Cookies() {
-		if c.Name == KnownCookie {
-			t.Error("signing out forgot the browser")
-		}
 	}
 }

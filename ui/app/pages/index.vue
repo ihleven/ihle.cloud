@@ -1,7 +1,35 @@
 <template>
-  <!-- Signed in: the areas this account has, inside the app's own chrome. -->
-  <NuxtLayout v-if="session" name="default">
-    <main class="grid w-screen grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] content-start">
+  <!-- An account that exists only for the pool gets the pool's own front door,
+       reproduced from ihleven.de: no chrome from this app around it, because
+       none of it would lead anywhere they may go. -->
+  <main
+    v-if="confined"
+    class="ght-door grid min-h-screen place-content-center overflow-hidden font-sans antialiased"
+  >
+    <div class="spotlight fixed right-0 left-0 z-10" />
+    <div class="z-20 max-w-[520px] text-center">
+      <div class="flex w-full flex-col items-center justify-center">
+        <NuxtLink
+          to="/geheimtipp"
+          class="gradient-border text-md cursor-pointer px-4 py-2 sm:px-6 sm:py-3 sm:text-xl"
+        >
+          zum Geheimtipp
+        </NuxtLink>
+      </div>
+    </div>
+  </main>
+
+  <!-- Everyone else: the areas this account has, inside the app's own chrome. -->
+  <NuxtLayout v-else name="default">
+    <!-- Two columns until there is room to auto-fit 200px tiles. A phone is
+         360–390px wide, so auto-fit on its own drops to one column and the page
+         becomes a long scroll of a single tile at a time.
+
+         w-full, not w-screen: this sits inside UMain, which is a flex
+         container, and 100vw is the viewport including any scrollbar — wider
+         than the space it has been given. The overflow shows as a pale strip
+         down the right and a page that scrolls sideways. -->
+    <main class="grid w-full grid-cols-2 content-start sm:grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]">
       <section class="flex items-center justify-between bg-ral-7035">
         <Logo />
       </section>
@@ -23,53 +51,37 @@
       </p>
     </main>
   </NuxtLayout>
-
-  <!-- Signed out: the front door, and it is the pool's. -->
-  <main v-else class="relative flex min-h-screen w-screen flex-col items-center justify-center bg-zinc-100">
-    <NuxtLink
-      to="/geheimtipp"
-      class="rounded-2xl bg-sky-500/90 px-16 py-12 text-4xl font-black text-white shadow-lg hover:bg-sky-500"
-    >
-      Geheimtipp
-    </NuxtLink>
-
-    <!-- Only for a browser that has signed in here before. The rest of the app
-         is not advertised to people who came for the tipping. -->
-    <NuxtLink
-      v-if="known"
-      to="/famihlie"
-      class="absolute right-4 bottom-4 text-xs text-gray-400 hover:text-gray-600"
-    >
-      ihlvn
-    </NuxtLink>
-  </main>
 </template>
 
 <script setup lang="ts">
-// Public, and the only page in the app that is.
+// The front page, and the sign-in surface.
 //
-// Two audiences share this domain and only one of them has an account here. A
-// sign-in shown to the other is a dead end, so the front page asks for nothing:
-// it offers the pool, and — to a browser that has been here before — a quiet way
-// back into the rest. Every other route is gated exactly as before.
-definePageMeta({ public: true, layout: false })
+// It used to be public: two audiences share this domain, only one of them had
+// an account, and a sign-in shown to the other was a dead end — so the page
+// asked for nothing and offered the pool, with a quiet way back for a browser
+// that had been here before.
+//
+// One form now accepts both, so the dead end is gone and with it the reason to
+// be public. Signed out, app.vue raises the sign-in dialog over this page like
+// any other gated route. Signed in, what someone sees follows from who they
+// are: the tiles they are entitled to, or — for an account that exists only for
+// the pool — the pool's own door.
+//
+// The chrome is chosen by rendering it, not by setPageLayout. setPageLayout
+// writes the name onto route meta, which for "/" persists for the rest of the
+// visit — so it would stamp this app's bar onto the pool's pages opened from
+// here. `layout: false` plus an explicit NuxtLayout is what keeps each branch
+// to its own.
+definePageMeta({ layout: false })
 
 const { session } = useAuth()
 const { allowed } = useModules()
 
-// Set wherever a session begins and left alone by signing out; see
-// app/auth/session.go. Not a permission: it only decides whether the way back
-// is shown, and everything it leads to still asks for a session.
-const known = useCookie<string | null>('ihlvn_known')
-
-// The chrome is chosen by rendering it, not by setPageLayout.
-//
-// setPageLayout writes the name onto route meta, which for "/" persists for the
-// rest of the visit — so signing out left the app's bar on a page that is meant
-// to show none. On a first load it defers instead to a beforeResolve hook that
-// fires on the *next* navigation, which stamped "default" onto whatever was
-// opened from here: the pool's own header and background were replaced by this
-// app's. Both are avoided by letting the template decide.
+// A confined account is reported as entitled to the pool and nothing else, by
+// its type rather than by its permissions; see Service.offered.
+const confined = computed(() =>
+  session.value?.modules.length === 1 && session.value.modules[0] === 'geheimtipp',
+)
 
 // Each tile names the area it belongs to; the entitlement decides whether it is
 // rendered at all.
@@ -84,3 +96,83 @@ const tiles = computed(() => allowed([
   { module: 'geheimtipp', label: 'Geheimtipp', to: '/geheimtipp', class: 'bg-sky-400/80' },
 ]))
 </script>
+
+<!-- Carried over from ihleven.de's own front page so the door looks the way it
+     always has: a blurred gradient behind, and a pill whose border is a gradient
+     masked to the edge, sliding on hover. Not scoped — the spotlight is fixed
+     and full-bleed, and scoping buys nothing for two classes used here only. -->
+<style>
+/* The surface follows prefers-color-scheme rather than Tailwind's dark:
+   variant, which never fires here — @nuxt/ui's colorMode is off, so no .dark
+   class is ever set. Keying the page off one signal and the pill off another
+   is how you get a white page holding a pill styled for a dark one. */
+.ght-door {
+  background-color: #fff;
+  color: #000;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ght-door {
+    background-color: #000;
+    color: #fff;
+  }
+}
+
+.spotlight {
+  background: linear-gradient(45deg, #00dc82 0%, #36e4da 50%, #0047e1 100%);
+  filter: blur(20vh);
+  height: 40vh;
+  bottom: 30vh;
+}
+
+.gradient-border {
+  position: relative;
+  border-radius: 0.5rem;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+@media (prefers-color-scheme: light) {
+  .gradient-border {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .gradient-border::before {
+    background: linear-gradient(90deg, #e2e2e2 0%, #e2e2e2 25%, #00dc82 50%, #36e4da 75%, #0047e1 100%);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .gradient-border {
+    background-color: rgba(20, 20, 20, 0.3);
+  }
+
+  .gradient-border::before {
+    background: linear-gradient(90deg, #303030 0%, #303030 25%, #00dc82 50%, #36e4da 75%, #0047e1 100%);
+  }
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 0.5rem;
+  padding: 2px;
+  width: 100%;
+  background-size: 400% auto;
+  opacity: 0.5;
+  transition: background-position 0.3s ease-in-out, opacity 0.2s ease-in-out;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.gradient-border:hover::before {
+  background-position: -50% 0;
+  opacity: 1;
+}
+</style>

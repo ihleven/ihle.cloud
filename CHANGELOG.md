@@ -7,6 +7,16 @@ This file starts here; anything before the entries below is only in the git hist
 
 ## Unreleased
 
+### Changed
+
+- **One sign-in for the family app and the tipping pool**: the two used to be separate — an account here, a different account there, two forms, two passwords, and a front page that offered only the pool, keeping everything else behind a marker cookie so that somebody who came for the tipping was not met by a sign-in for an account they do not have. There is now one form, on the front page, and it takes either. Somebody who plays in the pool types the username and password they have always used and is signed in; an account is made for them behind the scenes the first time, and from then on their password lives here. Nothing is asked of them and nothing is announced.
+
+  Such an account is limited to the pool and refused everywhere else, so nobody reaches the family app by having played football tips for twenty years. Somebody who is both keeps their ordinary account and everything it opens. The pool's own credential is no longer handed to the browser at all: it is made fresh for each request the app forwards on someone's behalf, which means signing out ends it, nothing is left behind on a shared machine, and there is nothing to expire.
+
+  **Anyone still signed in through the pool's old form is signed out once** and needs to sign in again here. Sign-ins made the old way left a credential in the browser that lasted weeks; continuing to honour it would have been a second way in that needs no account, outlives signing out and cannot be taken away. One sign-in each is worth that.
+
+  Two smaller things follow. **A password can now be changed from the app**, which it never could — only an administrator could set one, and that would have left everyone arriving from the pool stuck with a password they chose years ago. And being asked to sign in halfway through something now returns to the front page, where the form is; it used to point at an address that has never existed here and only appeared to work by accident.
+
 ### Added
 
 - **The files on HiDrive can be browsed in the app**: folders and their contents, with the size, dimensions and date of each entry, a trail back up, and the pictures of a folder shown as pictures rather than as a list of filenames. A single file can be looked at and downloaded. It is its own area, so it appears only for an account that has been given it — having storage configured is not by itself permission to go through it, and an account that has been given the area but has no storage of its own is shown the family's.

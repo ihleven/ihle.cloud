@@ -32,40 +32,6 @@ func (s *Service) setSessionCookie(w http.ResponseWriter, token string) {
 		Secure:   s.cfg.CookieSecure,
 		SameSite: s.cfg.SameSite,
 	})
-	s.rememberBrowser(w)
-}
-
-// KnownCookie marks a browser that has signed in here at least once.
-//
-// The front page shows the pool and nothing else by default: this app's
-// audience and the pool's overlap only partly, and someone who came for the
-// tipping should not be met by a sign-in for an account they do not have. This
-// cookie is how a browser that has been here before gets its way back.
-//
-// It is not a security measure and must not be mistaken for one. It is readable
-// by any script — it has to be, because a signed-out visitor gets 401 from the
-// session endpoint, so the page itself has to decide — and it is therefore
-// trivially forged. All it can reveal is a link that anyone reaches by typing
-// the path; every route behind it still requires a session.
-const KnownCookie = "ihlvn_known"
-
-// knownTTL outlives any session on purpose: the point is to be remembered after
-// signing out, and on a browser used a few times a year.
-const knownTTL = 5 * 365 * 24 * time.Hour
-
-// rememberBrowser is set wherever a session begins, so no future way of signing
-// in can forget it. Signing out deliberately leaves it: being remembered is
-// what it is for.
-func (s *Service) rememberBrowser(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     KnownCookie,
-		Value:    "1",
-		Path:     "/",
-		Expires:  time.Now().Add(knownTTL),
-		HttpOnly: false,
-		Secure:   s.cfg.CookieSecure,
-		SameSite: s.cfg.SameSite,
-	})
 }
 
 func (s *Service) clearCookie(w http.ResponseWriter, name string) {
@@ -159,12 +125,17 @@ func (s *Service) OptionalFunc(next func(http.ResponseWriter, *http.Request)) ht
 // denied sends a browser to the sign-in page and everything else a 401.
 // Redirecting an XHR or a video request would hand the caller an HTML page
 // where it expected data.
+//
+// The sign-in page is "/": the form is a dialog the front page raises over
+// itself, not a route. It used to send people to "/login", which has never
+// existed here — the 404 fell through to the SPA, which then happened to show
+// the form, so the mistake looked like it worked.
 func (s *Service) denied(w http.ResponseWriter, r *http.Request) {
 	if !wantsHTML(r) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	target := "/login"
+	target := "/"
 	if next := r.URL.RequestURI(); isLocalPath(next) && next != "/" {
 		target += "?next=" + url.QueryEscape(next)
 	}

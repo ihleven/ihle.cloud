@@ -16,8 +16,20 @@ export function useGhtSession() {
   const aktuell = useState<Aktuell | null>('ght:aktuell', () => null)
   const failed = useState<boolean>('ght:aktuell:failed', () => false)
 
-  /** The signed-in login, or "" — the pool sends "" for a caller it does not know. */
-  const login = computed(() => aktuell.value?.authkey || '')
+  /**
+   * The signed-in login, or "".
+   *
+   * This app's session comes first. Whoever is signed in here is who the pool is
+   * told about — the proxy mints its credential from the session — so the name
+   * is already known without asking, and a pool that is briefly unreachable no
+   * longer reads as being signed out. The pool's own answer is the fallback,
+   * for a visitor with no account here at all.
+   */
+  const { session } = useAuth()
+  const login = computed(() => {
+    if (session.value?.modules.includes('geheimtipp')) return session.value.sub
+    return aktuell.value?.authkey || ''
+  })
   const signedIn = computed(() => login.value !== '')
 
   /** The current edition's code, e.g. "2027". Not the `aktuell` flag in /ausgaben, which is set on every edition. */
@@ -48,18 +60,18 @@ export function useGhtSession() {
     return aktuell.value
   }
 
-  async function signIn(username: string, password: string) {
-    await ghtFetch('/login', {
-      method: 'POST',
-      body: new URLSearchParams({ username, password }),
-    })
-    await load(true)
-  }
-
+  /**
+   * Signing out of the pool is signing out of this app.
+   *
+   * There is no separate pool session left to end: the credential is minted per
+   * forwarded request from this app's session and never given to the browser,
+   * so ending the session is what makes it stop being minted. The pool's own
+   * /logout is gone with the cookie it used to clear.
+   */
   async function signOut() {
-    await ghtFetch('/logout', { method: 'POST' }).catch(() => {})
-    await load(true)
+    await useAuth().logout()
+    aktuell.value = null
   }
 
-  return { aktuell, login, signedIn, edition, registration, account, failed, load, signIn, signOut }
+  return { aktuell, login, signedIn, edition, registration, account, failed, load, signOut }
 }

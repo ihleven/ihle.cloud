@@ -2,13 +2,14 @@ package auth
 
 import (
 	"context"
-	"github.com/ihleven/ihlvn/app/cmsauth"
-	"github.com/interhome-group/cms/pkg/errs"
+	"errors"
 	"net"
 	"net/http"
 	"time"
 
+	"github.com/ihleven/ihlvn/app/cmsauth"
 	"github.com/ihleven/ihlvn/pkg/password"
+	"github.com/interhome-group/cms/pkg/errs"
 )
 
 // The sign-in surface: password login, the session the frontend polls, and
@@ -65,6 +66,14 @@ func (s *Service) sessionResponse(a *Account, expires time.Time) sessionResponse
 // The server still refuses the endpoints on the entitlement alone. This decides
 // what to offer, not what is allowed.
 func (s *Service) offered(a *Account) []string {
+	// A confined account is not governed by entitlements. The type decides, so
+	// a permission it may have picked up cannot widen what it is shown — and
+	// what it is shown is what it is allowed, since requireAccount refuses it
+	// everywhere else.
+	if a.Confined() {
+		return []string{cmsauth.GeheimtippArea}
+	}
+
 	entitled := cmsauth.Entitled(a)
 	if a.HiDrive.Alias != "" || s.cfg.SharedDrive {
 		return entitled
@@ -112,16 +121,36 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, http.StatusOK, s.sessionResponse(account, time.Now().Add(s.cfg.SessionTTL)))
 }
 
-// authenticatePassword resolves and verifies in one place so that Login and the
-// step-up before a passkey registration cannot drift apart.
+// authenticatePassword resolves a submitted name and password to an account.
+//
+// An account is the answer whenever one exists — matched or not, enabled or
+// not. The geheimtipp fallback below must be unreachable for a name that
+// already has an account: the pool's passwords are short, were chosen long ago,
+// and at least one pool login is also an account here with wider rights. So a
+// pool credential may create an account and must never open one.
 func (s *Service) authenticatePassword(ctx context.Context, name, plain string) (*Account, error) {
 	if name == "" || plain == "" {
 		return nil, ErrNoAccount
 	}
-	account, err := s.store.AccountByName(ctx, name)
-	if err != nil {
+
+	// Deliberately the lookup that sees disabled accounts too. A disabled one is
+	// a refusal, not a reason to look further.
+	account, err := s.store.DisabledAccountByName(ctx, name)
+	switch {
+	case errors.Is(err, ErrNoAccount):
+		return s.adoptGeheimtipper(ctx, name, plain)
+	case err != nil:
 		return nil, err
+	case account.Disabled:
+		return nil, ErrNoAccount
 	}
+
+	return s.verifyPassword(ctx, account, plain)
+}
+
+// verifyPassword checks a plaintext against an account's own stored hash.
+func (s *Service) verifyPassword(ctx context.Context, account *Account, plain string) (*Account, error) {
+	name := account.Name
 	if !account.HasPassword() {
 		return nil, ErrNoAccount
 	}
@@ -143,6 +172,54 @@ func (s *Service) authenticatePassword(ctx context.Context, name, plain string) 
 			s.log.Info("password hash upgraded", "account", name)
 		}
 	}
+	return account, nil
+}
+
+// adoptGeheimtipper signs in a pool player who has no account here yet, and
+// creates one from the credential they typed.
+//
+// This is the whole of what makes the change invisible to them: they meet a new
+// form, type what they have always typed, and are in. It runs only when no
+// account exists for the name, and only until the migration is switched off.
+//
+// Refusals are logged but reported as the same ErrNoAccount as everything else,
+// so the endpoint still cannot be used to find out who exists.
+func (s *Service) adoptGeheimtipper(ctx context.Context, login, plain string) (*Account, error) {
+	if !s.cfg.AdoptGeheimtipp {
+		return nil, ErrNoAccount
+	}
+
+	person, err := s.store.VerifyGeheimtippPassword(ctx, login, plain)
+	if err != nil {
+		return nil, err
+	}
+
+	// An address is required rather than invented: account.email is unique and
+	// is what a commit is signed with, so a placeholder would reach commit
+	// trailers and occupy the slot the real address needs later.
+	if person.Email == "" {
+		s.log.Warn("geheimtipp sign-in refused, no address upstream", "login", login)
+		return nil, ErrNoAccount
+	}
+
+	hash, err := password.Hash(plain)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := s.store.AdoptGeheimtipper(ctx, person, hash)
+	if errors.Is(err, ErrExists) {
+		// The login or the address already belongs to an account. Claiming it
+		// on an unverified pool address would be a way into that account, so
+		// this needs a person to resolve.
+		s.log.Warn("geheimtipp sign-in refused, login or address already in use", "login", login)
+		return nil, ErrNoAccount
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	s.log.Info("geheimtipp account created on first sign-in", "account", account.Name)
 	return account, nil
 }
 

@@ -16,7 +16,7 @@ func TestProxyScopesCookiesToItsMountPoint(t *testing.T) {
 	}))
 	defer up.Close()
 
-	proxy, err := Proxy(up.URL, "/ght")
+	proxy, err := Proxy(up.URL, "/ght", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

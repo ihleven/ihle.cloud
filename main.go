@@ -57,6 +57,15 @@ type Flags struct {
 	// it. Not a constant, or after the domain moves the proxy would call itself.
 	GeheimtippAPI   string `arg:"--ght-api,   env:GHT_API"   default:"https://ihleven.de/api/v1" placeholder:"URL"`
 	GeheimtippMedia string `arg:"--ght-media, env:GHT_MEDIA" default:"https://ihleven.de/media" placeholder:"URL"`
+	// The key the pool signs its tokens with. Shared with it by necessity: the
+	// pool verifies a signature and asks nobody anything, so signing with the
+	// same key is what lets this app speak for someone it has signed in. Unset
+	// proxies the pool anonymously rather than refusing to start.
+	GeheimtippSecret string `arg:"--ght-secret, env:GHT_SECRET" placeholder:"KEY" help:"signing key for the geheimtipp pool's tokens. Unset disables minting"`
+	// Whether a pool player with no account here can still sign in, which
+	// creates one. Meant to be turned off once everyone has: see
+	// geheimtipp_migration.
+	GeheimtippAdopt bool `arg:"--ght-adopt, env:GHT_ADOPT" default:"true" help:"let a geheimtipp player sign in with their pool password and create an account"`
 
 	// The HiDrive account media is delivered from. Delivery is not per-viewer:
 	// a film lives in one place, and the same entry has to resolve to the same
@@ -71,7 +80,6 @@ type Flags struct {
 	SearchIndex string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
 
 	JWTIssuer      string        `arg:"--jwt-issuer,env:JWT_ISSUER"                         default:"ihle.cloud" placeholder:"ISSUER"`
-	JWTSecretKey   string        `arg:"--jwt-secret,env:JWT_SECRET_KEY"                                          placeholder:"KEY"`
 	JWTDuration    int           `arg:"--jwt-duration,env:JWT_DURATION"        default:"36000" help:"Duration of JWT token in seconds"`
 	CookieName     string        `arg:"env:COOKIE_NAME"                        default:"jwt"  help:"Name for auth cookie"`
 	CookieSameSite http.SameSite `arg:"env:COOKIE_SAME_SITE"                   default:"2"    help:"SameSite attribute of auth cookie: Default (1) Lax (2), Strict (3), None (4)"`
@@ -220,19 +228,23 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 
 	fapi := familie.NewApi(cms.Repo, cms.Engine)
 
-	ghtAPI, err := geheimtipp.Proxy(flags.GeheimtippAPI, "/ght")
+	// Whoever is signed in here is who the pool is told about. The token is
+	// minted per forwarded request and never given to the browser, so there is
+	// one credential in play and one place it can be revoked.
+	ghtID := poolIdentity{svc: authsvc}
+	ghtMinter := geheimtipp.NewMinter(flags.GeheimtippSecret)
+	if ghtMinter == nil {
+		slog.Warn("geheimtipp: no signing secret, the pool will be proxied anonymously")
+	}
+
+	ghtAPI, err := geheimtipp.Proxy(flags.GeheimtippAPI, "/ght", ghtID, ghtMinter)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ghtMedia, err := geheimtipp.Proxy(flags.GeheimtippMedia, "/ght/media")
+	ghtMedia, err := geheimtipp.Proxy(flags.GeheimtippMedia, "/ght/media", ghtID, ghtMinter)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ghtLogin, err := geheimtipp.Login(flags.GeheimtippAPI, site.CookieSecure, "/ght")
-	if err != nil {
-		log.Fatal(err)
-	}
-	ghtLogout := geheimtipp.Logout(site.CookieSecure, "/ght")
 
 	// The enrollment link's lifetime matches the CLI's default: long enough to
 	// hand over, short enough that a link left in a chat log stops working.
@@ -253,6 +265,10 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("      /auth/login         ", authsvc.Login),
 		route("      /auth/logout        ", authsvc.Logout),
 		route("      /auth/session       ", authsvc.Session),
+		// Not behind requireAccount: it authenticates itself, which is what
+		// lets an account confined to the Tipprunde reach it. Being able to
+		// replace the password they arrived with is the point.
+		route(" POST /auth/password      ", authsvc.ChangePassword),
 
 		// Passkey ceremonies. Registration is authorised by a session or an
 		// enrollment link, and in either case by the account's password.
@@ -308,8 +324,6 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		//
 		// Sign-in is ours rather than the proxy's because the upstream returns
 		// the token in the body and leaves the cookie to its caller.
-		route(" POST /ght/login           ", ghtLogin),
-		route(" POST /ght/logout          ", ghtLogout),
 		route("      /ght/media/{path...} ", ghtMedia),
 		route("      /ght/{path...}       ", ghtAPI),
 

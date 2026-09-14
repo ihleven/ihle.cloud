@@ -52,8 +52,6 @@ proxy in `app/geheimtipp` (Go) mounts it under this origin:
 |---|---|---|
 | `/ght/{path...}` | the pool's API | `https://ihleven.de/api/v1` |
 | `/ght/media/{path...}` | its media | `https://ihleven.de/media` |
-| `POST /ght/login` | `<api>/login`, then mints the cookie | |
-| `POST /ght/logout` | — clears the cookie | |
 
 Both upstreams are configuration (`GHT_API`, `GHT_MEDIA`), and the UI reads its
 base from `public.geheimtippBase`. So serving both from one origin later is a
@@ -61,29 +59,54 @@ config change, not a rewrite — and the proxy may disappear entirely.
 
 ### Sign-in
 
-`POST /login` takes a **form** with `username` and `password` — not JSON, and not
-a `login` field; both of those return 401. It answers `{Username, JWT}`.
+**There is one sign-in, and it is this app's.** The form on `/` takes a pool
+login and password just as the pool's own did, so someone who has always played
+types what they have always typed. The first time, an account is created behind
+them from `geheimtipp_migration` — see `Staging`-style notes in
+`app/db/migrations/0003_geheimtipp.sql`. After that they are an ordinary account
+here, confined to the pool.
 
-The backend reads the JWT from a **`token` cookie only**; an `Authorization`
-header is ignored. It also sets that cookie itself, for `Path=/` — correct on
-its own site, wrong here, where `/` is the family app. So:
+**The pool's credential never reaches the browser.** The backend reads its JWT
+from a **`token` cookie only** — an `Authorization` header is ignored — so the
+token has to be a cookie *on the request the pool sees*, which is not the same
+as a cookie in the browser. `app/geheimtipp` mints one per forwarded request
+from whoever is signed in here, and sets it on the outbound request only.
 
-- `POST /ght/login` calls upstream itself and sets the cookie `Path=/ght`,
-  `HttpOnly`, and **does not pass the JWT to the browser**. The pool's own
-  frontend put it in a readable cookie and decoded it client-side to learn who
-  was signed in; here `GET /aktuell` answers that, so the credential can stay out
-  of reach of any script on the page.
-- The proxy rewrites `Path` on every cookie it forwards, for the same reason.
+**A `token` the browser sends is never forwarded**, whether or not one is minted
+to replace it. The pool's own sign-in used to leave one lasting weeks, and
+honouring it would be a second way in — one that needs no account here, survives
+signing out, and cannot be revoked. Anyone still carrying one signs in again,
+which was the deliberate choice: there is one credential and this app issues it.
+
+Consequences worth knowing:
+
+- signing out of this app is signing out of the pool, because the credential is
+  derived from the session rather than stored;
+- there is nothing to expire: the minted token lives for one request;
+- a deployment with no `GHT_SECRET` still proxies, anonymously, so the pool's
+  public pages work without the pool being configured at all.
+
+The proxy still rewrites `Path` on every cookie it forwards, so the pool's own
+`Path=/` session cookie cannot land at the root of the family app.
 
 There is a test for each.
 
 ### The gate
 
-Pages under `/geheimtipp/**` keep `definePageMeta({ public: true })`, so this
-app's own sign-in overlay never covers them. A layer-local global middleware
-(`ght.global.ts`) gates them on the pool's session instead and sends an
-unknown caller to `/geheimtipp/login?weiter=…`. It is a UX guard, not a security
-boundary — the backend checks its own token on every write.
+Pages under `/geheimtipp/**` keep `definePageMeta({ public: true })`, and that
+flag must stay. It is about this app's sign-in overlay, not about access:
+without it every visitor to the pool would meet an ihlvn sign-in dialog laid
+over pages they are welcome to read. Removing it "for consistency" now that the
+two sign-ins are one is the likeliest way to break this.
+
+A layer-local global middleware (`ght.global.ts`) checks this app's session
+first — being signed in here is being signed in to the pool — and only asks the
+pool for someone with no account at all. An unknown caller goes to `/`, the one
+sign-in form. It is a UX guard, not a security boundary: the pool's backend
+checks its token on every write.
+
+`/geheimtipp/login` still exists but only forwards to `/`. The route is kept
+because links to it are: the pool's own pages pointed there for years.
 
 ### State
 

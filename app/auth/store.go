@@ -45,9 +45,11 @@ type Account struct {
 	Email       string
 	Handle      []byte
 	Disabled    bool
-	HiDrive     HiDrive
-	CMS         CMSProfile
-	CreatedAt   time.Time
+	// Type is what the account may do, not where it came from. See Confined.
+	Type      string
+	HiDrive   HiDrive
+	CMS       CMSProfile
+	CreatedAt time.Time
 
 	// Never leaves the package: password.go verifies against it, and callers
 	// change it through SetPasswordHash.
@@ -75,7 +77,7 @@ type CMSProfile struct {
 func (a *Account) HasPassword() bool { return a.passwordHash != "" }
 
 const accountColumns = `
-	a.id, a.name, a.display_name, a.email, a.handle, a.disabled,
+	a.id, a.name, a.display_name, a.email, a.handle, a.disabled, a.type,
 	coalesce(a.password_hash, ''), a.hidrive, a.created_at,
 	coalesce(c.groups, '{}'), coalesce(c.permissions, '{}')`
 
@@ -101,7 +103,7 @@ func (s *Store) CreateAccount(ctx context.Context, name, displayName, email stri
 	}
 	return &Account{
 		ID: id, Name: name, DisplayName: displayName, Email: email,
-		Handle: handle, CreatedAt: createdAt,
+		Handle: handle, Type: TypeFull, CreatedAt: createdAt,
 	}, nil
 }
 
@@ -164,7 +166,7 @@ type scannable interface {
 func scanAccount(row scannable) (*Account, error) {
 	var a Account
 	var hidrive []byte
-	if err := row.Scan(&a.ID, &a.Name, &a.DisplayName, &a.Email, &a.Handle, &a.Disabled,
+	if err := row.Scan(&a.ID, &a.Name, &a.DisplayName, &a.Email, &a.Handle, &a.Disabled, &a.Type,
 		&a.passwordHash, &hidrive, &a.CreatedAt,
 		&a.CMS.Groups, &a.CMS.Permissions); err != nil {
 		return nil, err

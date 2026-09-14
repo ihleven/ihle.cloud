@@ -42,6 +42,8 @@ const { login, account, signOut } = useGhtSession()
 
 async function signOutAndLeave() {
   await signOut()
-  await navigateTo('/geheimtipp/login')
+  // The front page, because that is where signing in happens now: one form for
+  // both, so there is no separate pool sign-in to come back to.
+  await navigateTo('/')
 }
 </script>

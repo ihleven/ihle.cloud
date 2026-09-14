@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/ihleven/ihlvn/pkg/passkey"
+	"github.com/ihleven/ihlvn/pkg/password"
 )
 
 // Config is the deployment's half of the service: names, lifetimes and the
@@ -70,6 +71,21 @@ type Config struct {
 	// one. Held as a bool rather than as the alias: what this decides is whether
 	// there is anything to browse, not what.
 	SharedDrive bool
+
+	// AdoptGeheimtipp enables the migration fallback: a name with no account
+	// here is looked up among the pool's players, and a matching password
+	// creates the account.
+	//
+	// It is a setting rather than a constant because it is meant to be turned
+	// off. Once everyone who plays has signed in once, geheimtipp_migration is
+	// empty and the fallback is dead weight holding a table of plaintext
+	// passwords open. Turning it off is the step before dropping both.
+	AdoptGeheimtipp bool
+
+	// MinPasswordLength is where the screening starts calling a password short.
+	// Passed in rather than fixed, for the same reason the administrator's path
+	// takes it: it is a policy, not a fact.
+	MinPasswordLength int
 }
 
 // Service is the use-case and HTTP half. Store is the persistence half; nothing
@@ -83,6 +99,10 @@ type Service struct {
 	// not. The WebAuthn protocol itself lives in pkg/passkey; what is here is who
 	// may start a ceremony and what finishing one means.
 	ceremonies *passkey.Ceremonies
+	// breaches screens a password someone chooses for themselves, exactly as the
+	// administrator's path screens one chosen for them. Held so a test can point
+	// it at a stub rather than at a third party over the network.
+	breaches *password.BreachChecker
 }
 
 // New builds the service, filling in defaults for anything the caller left zero.
@@ -131,6 +151,7 @@ func NewService(store *Store, cfg Config, log *slog.Logger) (*Service, error) {
 		cfg:      cfg,
 		log:      log,
 		throttle: newThrottle(cfg.FailureLimit, cfg.FailureWindow),
+		breaches: &password.BreachChecker{},
 	}
 
 	if cfg.RPID != "" {

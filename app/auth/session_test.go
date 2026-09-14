@@ -264,7 +264,9 @@ func TestRequireGatesAndRedirects(t *testing.T) {
 		if w.Code != http.StatusSeeOther {
 			t.Fatalf("got %d, want 303", w.Code)
 		}
-		if got := w.Header().Get("Location"); got != "/login?next=%2Fentries%2Fx" {
+		// "/" is the sign-in surface: the form is a dialog the front page
+		// raises over itself, not a route of its own.
+		if got := w.Header().Get("Location"); got != "/?next=%2Fentries%2Fx" {
 			t.Errorf("Location = %q", got)
 		}
 	})
@@ -347,8 +349,8 @@ func TestDeniedRedirectStaysOnSite(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 
-	if got := w.Header().Get("Location"); got != "/login" {
-		t.Errorf("Location = %q, want a bare /login", got)
+	if got := w.Header().Get("Location"); got != "/" {
+		t.Errorf("Location = %q, want a bare /", got)
 	}
 }
 

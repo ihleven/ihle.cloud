@@ -165,7 +165,6 @@ definePageMeta({
 
       if (!session.value.permissions.bar) {
         console.log('search not allowed', process.env, session.value.permissions)
-        // return navigateTo('/login')
       }
 
       // counter.value = counter.value || Math.round(Math.random() * 1000)

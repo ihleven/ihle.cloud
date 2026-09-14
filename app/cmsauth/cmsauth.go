@@ -29,12 +29,6 @@ func init() {
 	modules.Define("filme", "Die Super-8-Filme.")
 	modules.Define("content", "Der Inhalts-Editor.")
 	modules.Define("familie", "Stammbaum und Personen.")
-	// Offering the pool, not admitting anyone to it: geheimtipp is a separate
-	// site with its own users and its own sign-in, and this app's entitlements
-	// have no standing there. Deliberately absent from the route guard, so an
-	// account without it is simply not shown the link and is not blocked from
-	// following one.
-	modules.Define("geheimtipp", "Die Tipprunde.")
 	modules.Define("kalender", "Der Kalender.")
 	modules.Define("mediathek", "Die Mediathek.")
 	modules.Define("musik", "Die Musik.")
@@ -56,6 +50,26 @@ var Hidrive = modules.Define(HidriveArea, "Die Dateien auf HiDrive.")
 // browse, and comparing against a literal there would be a second place to keep
 // the spelling right.
 const HidriveArea = "hidrive"
+
+// Geheimtipp says that an account plays in the pool.
+//
+// The pool now shares this app's sign-in: an account here is how someone gets
+// in, and the proxy mints the pool's own credential from the session. This is
+// what decides whether it does — so the entitlement admits, and no longer
+// merely offers, which is why it is held as a key like Hidrive and Admin
+// rather than only defined.
+//
+// It is still absent from the route guard, and deliberately so: the proxy has
+// to stay open, because the pool has pages a visitor with no account may read
+// and gating the route would take those away. What the key gates is whose name
+// goes into the token, not who may reach the pool at all.
+var Geheimtipp = modules.Define(GeheimtippArea, "Die Tipprunde.")
+
+// GeheimtippArea is the pool's area id, as the session reports it. Named for
+// the same reason as HidriveArea: a confined account is reported as entitled to
+// this area without its permissions being consulted, and a literal there would
+// be a second place to keep the spelling right.
+const GeheimtippArea = "geheimtipp"
 
 // Admin gates account administration.
 //

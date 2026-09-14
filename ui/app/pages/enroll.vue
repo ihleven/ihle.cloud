@@ -1,6 +1,10 @@
 <template>
-  <article class="flex h-screen w-screen items-center justify-center bg-amber-400">
-    <div class="w-96 rounded bg-white p-6 shadow">
+  <!-- w-full, not w-screen: this sits inside UMain, a flex container, and 100vw
+       is the viewport including any scrollbar — wider than the space it has.
+       The card is capped rather than fixed at 24rem, which is itself wider than
+       a small phone; it only fitted before because flex-shrink rescued it. -->
+  <article class="flex h-screen w-full items-center justify-center bg-amber-400">
+    <div class="mx-4 w-full max-w-96 rounded bg-white p-6 shadow">
       <h1 class="text-lg font-semibold">Register a device</h1>
       <p class="mt-2 text-sm text-gray-600">
         This link lets you add a passkey to your account. Your password is

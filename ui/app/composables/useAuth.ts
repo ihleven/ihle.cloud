@@ -113,15 +113,6 @@ export const useAuth = (options?: UseAuthOptions) => {
     clearSession()
   }
 
-  // async function login2() {
-  //   await navigateTo(`${config.public.apiBaseURL}/tool-api/auth/login?redirect=${window.location}`, { external: true })
-  // }
-
-  function login(target: string) {
-    const redirect = typeof target === 'string' && target !== '' ? `?redirect=${target}` : ''
-    navigateTo('/api/auth/login' + redirect, { external: true })
-  }
-
   async function loginajax(username: string, password: string): Promise<boolean> {
     try {
       const formData = new FormData()
@@ -136,6 +127,7 @@ export const useAuth = (options?: UseAuthOptions) => {
         session.value.expires_in = sessionDuration(session.value)
       }
       console.log(' logged in for session = ', session.value)
+      await land()
       return true
     }
     catch (e) {
@@ -145,12 +137,32 @@ export const useAuth = (options?: UseAuthOptions) => {
     }
   }
 
+  // land sends an account that exists only for the pool to the pool.
+  //
+  // Signing in does not navigate — the form is a dialog raised over whatever
+  // page was asked for, and closing it reveals that page. For an account with
+  // one area that would mean landing on a front page holding one link. It is
+  // called from every way of signing in rather than from the password form
+  // alone, so a passkey does not behave differently.
+  //
+  // Already being inside the pool counts as arrived: this must not throw
+  // someone back to the entrance on every page load.
+  async function land() {
+    const modules = session.value?.modules
+    if (modules?.length !== 1 || modules[0] !== 'geheimtipp') {
+      return
+    }
+    if (!useRoute().path.startsWith('/geheimtipp')) {
+      await navigateTo('/geheimtipp')
+    }
+  }
+
   return {
     session,
     loadSession,
     clearSession,
     logout,
-    login,
     loginajax,
+    land,
   }
 }

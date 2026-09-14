@@ -71,7 +71,7 @@
 // Mounting with the dialog rather than with the app also puts the passkey offer
 // below on the right lifecycle — it is made each time the form appears, not once
 // when the app starts.
-const { loginajax, loadSession } = useAuth()
+const { loginajax, loadSession, land } = useAuth()
 const passkey = usePasskey()
 
 const username = ref('')
@@ -135,6 +135,7 @@ async function offerPasskeyInAutofill() {
   try {
     await passkey.signIn('conditional', conditional.signal)
     await loadSession()
+    await land()
   }
   catch (e) {
     if (!passkey.aborted(e)) error.value = passkey.describe(e)
@@ -148,6 +149,7 @@ async function signInWithPasskey() {
   try {
     await passkey.signIn()
     await loadSession()
+    await land()
   }
   catch (e) {
     error.value = passkey.describe(e)
