@@ -12,9 +12,13 @@ export default defineNuxtConfig({
   // A relative path while the layer is still moving, mirroring how go.mod
   // already depends on the same checkout. Switching to a git reference later is
   // a one-line change.
+  // The Go reference for this app's own packages, rendered natively by the SPA
+  // from the JSON the backend serves. The layer is the CMS's, extended rather
+  // than copied; app.config below points it at this module instead of the CMS's.
+  //
   // The geheimtipp pool, which is a separate site with its own backend and its
   // own sign-in rather than an area of this app — see ui/layers/geheimtipp.
-  extends: ['../../cms/ui/layers/entry', './layers/geheimtipp'],
+  extends: ['../../cms/ui/layers/entry', '../../cms/ui/layers/godoc', './layers/geheimtipp'],
 
   modules: [
     '@nuxt/eslint',

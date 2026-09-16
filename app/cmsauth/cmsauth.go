@@ -30,7 +30,6 @@ func init() {
 	modules.Define("content", "Der Inhalts-Editor.")
 	modules.Define("familie", "Stammbaum und Personen.")
 	modules.Define("kalender", "Der Kalender.")
-	modules.Define("mediathek", "Die Mediathek.")
 	modules.Define("musik", "Die Musik.")
 	modules.Define("search", "Die Suche.")
 }
@@ -44,6 +43,18 @@ func init() {
 // what stops an alias configured for some other purpose from quietly handing
 // out a file browser.
 var Hidrive = modules.Define(HidriveArea, "Die Dateien auf HiDrive.")
+
+// Mediathek gates the shared video library.
+//
+// Held as a key rather than only defined, because it is checked on the server.
+// Unlike Hidrive it decides nothing about *whose* tree is served: the library is
+// one fixed drive, the same for everybody, which is what makes this entitlement
+// the only thing standing in front of it — and what lets the responses be
+// cached by URL, since the URL identifies the file for every account alike.
+var Mediathek = modules.Define(MediathekArea, "Die Mediathek.")
+
+// MediathekArea is the area's id, as the session reports it.
+const MediathekArea = "mediathek"
 
 // HidriveArea is the area's id, as the session reports it. Named because the
 // session withholds this one area from an account that has no storage to

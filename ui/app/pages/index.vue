@@ -49,6 +49,21 @@
       <p v-if="!tiles.length" class="col-span-full p-8 text-muted">
         Für dieses Konto ist noch nichts freigeschaltet.
       </p>
+
+      <!-- The application's own Go documentation. A page of this app, from the
+           CMS's godoc layer, reading JSON the backend renders out of the source
+           embedded in the binary.
+
+           A tile like the others in every respect but its colour: it is not an
+           area an account is entitled to, so it is not in the list above, but it
+           sits in the same grid and should not announce itself as something
+           else. -->
+      <NuxtLink
+        to="/godoc"
+        class="block aspect-square bg-yellow-500/80 p-8"
+      >
+        <h1 class="text-lg font-black text-white hover:text-outline">Dokumentation</h1>
+      </NuxtLink>
     </main>
   </NuxtLayout>
 </template>

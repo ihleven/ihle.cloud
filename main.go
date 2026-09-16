@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -29,12 +28,14 @@ import (
 	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/mgmt"
 	"github.com/interhome-group/cms/mgmt/search"
+	"github.com/interhome-group/cms/pkg/godoc"
 
 	"github.com/alexflint/go-arg"
 	"github.com/ihleven/ihlvn/app/art"
 	"github.com/ihleven/ihlvn/app/familie"
 	"github.com/ihleven/ihlvn/pkg/api"
 	"github.com/ihleven/ihlvn/pkg/hi"
+	"github.com/interhome-group/cms/pkg/errs"
 
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -71,13 +72,14 @@ type Flags struct {
 	// a film lives in one place, and the same entry has to resolve to the same
 	// bytes for everyone — including, for public media, for nobody at all.
 	// Browsing is the other case, and takes its drive from the session.
-	MediaAlias  string `arg:"--media-alias, env:MEDIA_ALIAS" placeholder:"ALIAS" help:"HiDrive alias media is delivered from. Unset disables the media route"`
-	MediaRoot   string `arg:"--media-root,  env:MEDIA_ROOT"  placeholder:"PATH"  help:"directory media keys resolve against. Nothing outside it can be addressed"`
-	DriveRoot   string `arg:"--drive-root,  env:DRIVE_ROOT"  placeholder:"PATH"  default:"/public" help:"directory the file browser falls back to for an account with no drive of its own. Deliberately not the media root, which is where film keys resolve"`
-	DataDir     string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
-	SearchLevel string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
-	SearchDir   string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
-	SearchIndex string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
+	MediaAlias    string `arg:"--media-alias, env:MEDIA_ALIAS" placeholder:"ALIAS" help:"HiDrive alias media is delivered from. Unset disables the media route"`
+	MediaRoot     string `arg:"--media-root,  env:MEDIA_ROOT"  placeholder:"PATH"  help:"directory media keys resolve against. Nothing outside it can be addressed"`
+	DriveRoot     string `arg:"--drive-root,  env:DRIVE_ROOT"  placeholder:"PATH"  default:"/public" help:"directory the file browser falls back to for an account with no drive of its own. Deliberately not the media root, which is where film keys resolve"`
+	MediathekRoot string `arg:"--mediathek-root, env:MEDIATHEK_ROOT" placeholder:"PATH" help:"directory the shared video library resolves against. Its own root, not the media or drive one, so a bug in either route cannot reach the other's files. Unset disables the mediathek routes"`
+	DataDir       string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
+	SearchLevel   string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
+	SearchDir     string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
+	SearchIndex   string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
 
 	JWTIssuer      string        `arg:"--jwt-issuer,env:JWT_ISSUER"                         default:"ihle.cloud" placeholder:"ISSUER"`
 	JWTDuration    int           `arg:"--jwt-duration,env:JWT_DURATION"        default:"36000" help:"Duration of JWT token in seconds"`
@@ -215,6 +217,19 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	// root, so the fallback is the shared material and not the film store.
 	drives := hidrive.NewAPI(hitokens, hidrive.Shared{Alias: flags.MediaAlias, Root: flags.DriveRoot})
 
+	// The shared video library: one alias, one root, decided here and not per
+	// request. Everyone entitled to it sees the same shelf, which is what makes
+	// the entitlement the only gate and the responses cacheable by URL. Its own
+	// root rather than the media or drive one, on the same reasoning that keeps
+	// those two apart: the root is the containment.
+	var mediathek *hidrive.Library
+	if flags.MediaAlias != "" && flags.MediathekRoot != "" {
+		mediathek = hidrive.NewLibrary(
+			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.MediathekRoot}, nil),
+			slog.Default(),
+		)
+	}
+
 	authsvc, err := openAuth(context.Background(), pg, site, flags)
 	if err != nil {
 		log.Fatal("openAuth: ", err)
@@ -250,6 +265,11 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	// hand over, short enough that a link left in a chat log stops working.
 	admin := auth.NewAdminAPI(auth.NewAdmin(auth.NewStore(pg.Pool()), site.Origin, 15*time.Minute, flags.MinPasswordLength))
 
+	// uiBase is where the JSON view points its cross-links; the same prefix the
+	// routes below are mounted on, so a link in the rendered docs lands back
+	// here rather than on the CMS this renderer came from.
+	godocs := godoc.New(appSource, ".", "github.com/ihleven/ihlvn", "/godoc")
+
 	var route = api.WithRoute
 
 	srvr := api.New(
@@ -284,6 +304,23 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("      /api/auth/logout        ", authsvc.Logout),
 		route("      /api/auth/session       ", authsvc.Session),
 
+		// This application's own documentation, rendered from the source embedded
+		// in the binary. The renderer is the CMS's, reused rather than copied —
+		// it serves plain func(w, r) error handlers and takes no view on who may
+		// read them, so the gate is ours. Signed in only: the source is not
+		// secret, but it is not the public site either.
+		//
+		// Under the API prefix, not /godoc: the pages at /godoc belong to the
+		// SPA, which fetches these and renders them itself. A handler mounted
+		// there would win against the SPA's catch-all and serve its own HTML
+		// instead of the app.
+		//
+		// Order matters. The package route matches anything, so it goes last, or
+		// it would swallow the source route.
+		route("  GET /api/v1/godoc                ", requireAccount(authsvc, godocs.Index)),
+		route("  GET /api/v1/godoc/src/{file...}  ", requireAccount(authsvc, godocs.Source)),
+		route("  GET /api/v1/godoc/{pkg...}       ", requireAccount(authsvc, godocs.Package)),
+
 		// higrp.GET("/tags/*path", hi.TagsHandler)
 		route("  GET /media/videos/{path...}   ", serveContentWithPrefix("videos")), // used for serving local video on opalstack
 
@@ -313,6 +350,19 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/drive/meta/{path...}  ", requireHidrive(authsvc, drives.Meta)),
 		route("  GET  /api/v1/drive/media/{path...} ", requireHidrive(authsvc, drives.Media)),
 		route("  GET  /api/v1/drive/thumb           ", requireHidrive(authsvc, drives.Thumbnail)),
+		// Same drive, different delivery: stream reads the bytes here instead of
+		// handing out a pre-signed URL, which costs a round-trip less per request
+		// and keeps the store credential on this side. Worth it for anything
+		// seeked through; media stays for fetching a file once.
+		route("  GET  /api/v1/drive/stream/{path...}", requireHidrive(authsvc, drives.Stream)),
+
+		// The shared video library. Gated on the mediathek entitlement, not the
+		// hidrive one: being allowed to watch the shelf has nothing to do with
+		// being allowed to browse your own files, and since the library resolves
+		// against a fixed root there is no account-owned tree for the hidrive
+		// rule to be about.
+		route("  GET  /api/v1/mediathek/meta/{path...}  ", requireMediathek(authsvc, mediathek.Meta)),
+		route("  GET  /api/v1/mediathek/stream/{path...}", requireMediathek(authsvc, mediathek.Stream)),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
@@ -399,12 +449,19 @@ func serveContentWithPrefix(prefix string) func(http.ResponseWriter, *http.Reque
 
 	return func(w http.ResponseWriter, r *http.Request) error {
 
-		filename := path.Join(prefix, r.PathValue("path"))
-
-		fd, err := os.Open(filename)
+		// OpenInRoot, not Join+Open: the path comes from the URL, and joining a
+		// cleaned prefix with an uncleaned remainder is not containment.
+		// ServeMux redirects a literal "..", which is what made this look safe,
+		// but a percent-encoded one arrives decoded in PathValue — so
+		// "..%2f.env" read the secrets file, unauthenticated. OpenInRoot refuses
+		// anything resolving outside the directory, symlinks included.
+		fd, err := os.OpenInRoot(prefix, r.PathValue("path"))
 		if err != nil {
-			return err
+			// One answer for "no such file" and "not yours to ask for": the
+			// difference is only useful to whoever is probing.
+			return errs.New("not found", errs.HTTPStatus(http.StatusNotFound))
 		}
+		defer fd.Close()
 		stat, err := fd.Stat()
 		if err != nil {
 			return err

@@ -153,3 +153,11 @@ func requireAdmin(svc authenticator, h func(http.ResponseWriter, *http.Request) 
 func requireHidrive(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return requireModule(svc, cmsauth.Hidrive, "browsing the files requires the hidrive entitlement", h)
 }
+
+// requireMediathek gates the shared video library. A separate entitlement from
+// hidrive on purpose: the library is one fixed shelf rather than an account's
+// own storage, so the two permissions are about different things and neither
+// implies the other.
+func requireMediathek(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return requireModule(svc, cmsauth.Mediathek, "the mediathek requires the mediathek entitlement", h)
+}

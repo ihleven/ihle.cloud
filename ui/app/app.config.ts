@@ -1,5 +1,12 @@
 export default defineAppConfig({
 
+  // The godoc layer renders whatever module the backend serves; this says which
+  // one, for the breadcrumbs and the sidebar heading. Without it the pages would
+  // announce themselves as the CMS's documentation while showing this app's.
+  godoc: {
+    module: 'github.com/ihleven/ihlvn',
+  },
+
   // This app's contribution to the CMS entry layer's registries: content type ->
   // editor component name, and content type -> preview card in the directory
   // browser. Both are deep-merged with the layer's own, which carries only the
