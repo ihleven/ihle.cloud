@@ -76,10 +76,13 @@ type Flags struct {
 	MediaRoot     string `arg:"--media-root,  env:MEDIA_ROOT"  placeholder:"PATH"  help:"directory media keys resolve against. Nothing outside it can be addressed"`
 	DriveRoot     string `arg:"--drive-root,  env:DRIVE_ROOT"  placeholder:"PATH"  default:"/public" help:"directory the file browser falls back to for an account with no drive of its own. Deliberately not the media root, which is where film keys resolve"`
 	MediathekRoot string `arg:"--mediathek-root, env:MEDIATHEK_ROOT" placeholder:"PATH" help:"directory the shared video library resolves against. Its own root, not the media or drive one, so a bug in either route cannot reach the other's files. Unset disables the mediathek routes"`
-	DataDir       string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
-	SearchLevel   string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
-	SearchDir     string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
-	SearchIndex   string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
+
+	RetroRoot   string `arg:"--retro-root, env:RETRO_ROOT" placeholder:"PATH" help:"directory the magazine archive resolves against, on the same reasoning as the mediathek root: its own, so neither can reach the other's files. Unset disables the retro routes"`
+	MusikRoot   string `arg:"--musik-root, env:MUSIK_ROOT" placeholder:"PATH" help:"directory the music shelf resolves against, on the same reasoning as the mediathek root: its own, so neither can reach the other's files. Unset disables the musik routes"`
+	DataDir     string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
+	SearchLevel string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
+	SearchDir   string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
+	SearchIndex string `arg:"--search-index, env:SEARCH_INDEX"     default:"in-mem" help:"Search index mode: in-mem,recycle,create. NOTE: recycle and create DELETE the on-disk index if it cannot be opened" placeholder:"MODE"`
 
 	JWTIssuer      string        `arg:"--jwt-issuer,env:JWT_ISSUER"                         default:"ihle.cloud" placeholder:"ISSUER"`
 	JWTDuration    int           `arg:"--jwt-duration,env:JWT_DURATION"        default:"36000" help:"Duration of JWT token in seconds"`
@@ -230,6 +233,26 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		)
 	}
 
+	// The magazine archive: one shelf again, and its own root, so that a mistake
+	// in either set of routes cannot reach what the other serves.
+	var retro *hidrive.Library
+	if flags.MediaAlias != "" && flags.RetroRoot != "" {
+		retro = hidrive.NewLibrary(
+			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.RetroRoot}, nil),
+			slog.Default(),
+		)
+	}
+
+	// The music shelf: one fixed tree again, and its own root for the reason the
+	// archive has one.
+	var musik *hidrive.Library
+	if flags.MediaAlias != "" && flags.MusikRoot != "" {
+		musik = hidrive.NewLibrary(
+			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.MusikRoot}, nil),
+			slog.Default(),
+		)
+	}
+
 	authsvc, err := openAuth(context.Background(), pg, site, flags)
 	if err != nil {
 		log.Fatal("openAuth: ", err)
@@ -363,6 +386,26 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		// rule to be about.
 		route("  GET  /api/v1/mediathek/meta/{path...}  ", requireMediathek(authsvc, mediathek.Meta)),
 		route("  GET  /api/v1/mediathek/stream/{path...}", requireMediathek(authsvc, mediathek.Stream)),
+
+		// The magazine archive. Thumbnails as well as bytes, because an issue is
+		// a hundred-megabyte PDF and what a listing wants is its cover.
+		// No streaming route here, unlike the mediathek: the archive holds
+		// documents, and a reader asks for several pieces of one at once, which
+		// only the store can answer. Serving them the cheap way would answer
+		// such a request with the whole ninety-megabyte scan.
+		route("  GET  /api/v1/retro/meta/{path...}  ", requireRetro(authsvc, retro.Meta)),
+		route("  GET  /api/v1/retro/thumb/{path...} ", requireRetro(authsvc, retro.Thumbnail)),
+		route("  GET  /api/v1/retro/media/{path...} ", requireRetro(authsvc, retro.Media)),
+
+		// The music shelf reads its listings two ways on purpose: meta walks a
+		// level at a time, search reaches the whole shelf in one call. Which is
+		// the better bargain depends on how the shelf is arranged, so the page
+		// can switch between them and be measured rather than argued about.
+		route("  GET  /api/v1/musik/meta/{path...}   ", requireMusik(authsvc, musik.Meta)),
+		route("  GET  /api/v1/musik/search/{path...} ", requireMusik(authsvc, musik.Search)),
+		route("  GET  /api/v1/musik/tags/{path...}   ", requireMusik(authsvc, musik.Tags)),
+		route("  GET  /api/v1/musik/thumb/{path...}  ", requireMusik(authsvc, musik.Thumbnail)),
+		route("  GET  /api/v1/musik/stream/{path...} ", requireMusik(authsvc, musik.Stream)),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),

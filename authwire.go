@@ -161,3 +161,15 @@ func requireHidrive(svc authenticator, h func(http.ResponseWriter, *http.Request
 func requireMediathek(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return requireModule(svc, cmsauth.Mediathek, "the mediathek requires the mediathek entitlement", h)
 }
+
+// requireMusik gates the music shelf, on its own entitlement for the reason
+// the mediathek has one.
+func requireMusik(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return requireModule(svc, cmsauth.Musik, "the music shelf requires the musik entitlement", h)
+}
+
+// requireRetro gates the magazine archive, on its own entitlement for the
+// reason the mediathek has one.
+func requireRetro(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return requireModule(svc, cmsauth.Retro, "the archive requires the retro entitlement", h)
+}

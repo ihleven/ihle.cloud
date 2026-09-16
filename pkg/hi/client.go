@@ -79,11 +79,15 @@ func (c *Client) do(ctx context.Context, endpoint, token string, params url.Valu
 	return resp, nil
 }
 
-// metaFields and dirFields are the "need to know" field lists the API asks for:
-// requesting everything costs response time.
+// The "need to know" field lists the API is asked for: requesting everything
+// costs response time.
 const (
 	metaFields = "id,name,path,category,nmembers,ctime,has_dirs,mtime,readable,size,type,writable,mime_type,members,members.id,members.name,image.exif,image.height,image.width"
-	dirFields  = "id,name,path,category,nmembers,chash,ctime,mtime,has_dirs,readable,rshare,size,type,writable,members,members.category,members.chash,members.ctime,members.has_dirs,members.image.exif,members.image.height,members.image.width,members.mime_type,members.name,members.nmembers,members.size,members.type,mhash,mohash,nhash,parent_id"
+	// searchFields is spelled flat, unlike dirFields: a hit is not a member of
+	// anything, so the members.* prefixes the other endpoint needs would be
+	// rejected here as unknown fields.
+	searchFields = "path,name,type,category,size,nmembers,mtime,mime_type"
+	dirFields    = "id,name,path,category,nmembers,chash,ctime,mtime,has_dirs,readable,rshare,size,type,writable,members,members.category,members.chash,members.ctime,members.has_dirs,members.image.exif,members.image.height,members.image.width,members.mime_type,members.name,members.nmembers,members.size,members.type,mhash,mohash,nhash,parent_id"
 )
 
 // Meta describes one filesystem object.
@@ -94,6 +98,57 @@ func (c *Client) Meta(ctx context.Context, token, path string) (*Meta, error) {
 // Dir describes a directory and its members.
 func (c *Client) Dir(ctx context.Context, token, path string) (*Meta, error) {
 	return c.meta(ctx, "/dir", token, path, dirFields)
+}
+
+// Search lists what is below a path at any depth.
+//
+// This is the only recursive listing the API has: /dir reaches exactly one
+// level and refuses both a nested members.members field and a recursive or
+// depth parameter. What comes back is flat — every hit carries its own full
+// path — and in no particular order, a child quite happily preceding its
+// parent, so a caller building a tree works from the paths and not the
+// sequence.
+//
+// It filters rather than enumerates, so something has to select the hits.
+// category "dir" selects every directory below the path and needs no pattern;
+// there is no equivalent for files, because the API accepts no other category,
+// so files are selected by pattern. A pattern is a plain substring of the name:
+// "*" is not a wildcard there and matches nothing at all.
+//
+// It is also slow, in a way that does not follow the size of the answer — the
+// whole of one small shelf took as long as the whole of a drive holding a
+// hundred times more. A caller that has to answer a request promptly reads one
+// level with Dir and fans out; this is for a search box or a cached walk.
+func (c *Client) Search(ctx context.Context, token, path, pattern, category string) ([]Meta, error) {
+	params := url.Values{
+		"path":   []string{path},
+		"fields": []string{searchFields},
+	}
+	if pattern != "" {
+		params.Set("pattern", pattern)
+	}
+	if category != "" {
+		params.Set("category", category)
+	}
+
+	resp, err := c.do(ctx, "/search", token, params)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	defer io.Copy(io.Discard, resp.Body)
+
+	// The one endpoint that does not answer with an object: its hits arrive
+	// under a "result" key rather than as members of the thing searched, which
+	// is the shape's way of saying they are not all from one directory.
+	var envelope struct {
+		Result []Meta `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, Error{Message: "could not read the /search response: " + err.Error()}
+	}
+
+	return envelope.Result, nil
 }
 
 func (c *Client) meta(ctx context.Context, endpoint, token, path, fields string) (*Meta, error) {

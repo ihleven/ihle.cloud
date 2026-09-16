@@ -2,6 +2,20 @@
 @import "@nuxt/ui";
 @plugin '@tailwindcss/typography';
 
+/* Inter, as a dependency rather than as files in this repository.
+ *
+ * Self-hosted either way — the package ships the woff2 and nothing is fetched at
+ * run time — but a dependency has a version in the lockfile and a path to a
+ * newer one, which a file somebody downloaded once does not. iA Writer stays
+ * vendored under public/fonts/ia/ for the opposite reason: Fontsource has it
+ * only as static cuts, and the variable axes are worth keeping.
+ *
+ * Every script comes with it, which costs nothing to serve: each face carries a
+ * unicode-range, so a German page fetches the Latin file and leaves Cyrillic,
+ * Greek and Vietnamese alone.
+ */
+@import "@fontsource-variable/inter";
+
 /* Tailwind scans from app/ only, so classes that exist nowhere but the CMS entry
    layer — arbitrary values like pl-[8ch] among them — would silently not be
    generated. */
@@ -12,11 +26,90 @@
   --ui-header-height: --spacing(12);
 }
 
+/* iA Writer, served from here rather than fetched.
+ *
+ * Three families of one typeface, differing in how much room each letter gets:
+ * Mono gives every character the same, Duo widens only the ones that need it,
+ * and Quattro is near enough proportional to set prose in. All three are
+ * variable fonts, so one file covers a range of weights and a second covers the
+ * italics — which is why six files serve what would otherwise be twenty-four.
+ *
+ * The range is 400 to 700, which is what the files actually carry (checked with
+ * fontTools, and see /debug/fonts). Declaring the usual 100 to 900 would be a
+ * promise the fonts cannot keep: the browser clamps to what is there, so the
+ * lighter half would silently render at 400 while the stylesheet claimed
+ * otherwise. They carry a second axis too, SPCG from 0 to 150, which loosens
+ * the spacing; nothing uses it yet.
+ *
+ * Declared here because no font provider serves them: the typeface is iA's,
+ * released under the SIL Open Font License, so it is ours to ship but not
+ * something @nuxt/fonts can go and find. A family it cannot resolve is left
+ * alone, so these declarations stand rather than compete.
+ *
+ * Under assets/fonts/ia/ with the licence that covers them — the licence
+ * because it is this typeface's and not the directory's, assets because the
+ * build fingerprints what it finds there. A fingerprinted file may be cached
+ * forever, since replacing it changes its name; one served verbatim out of
+ * public/ keeps its name and would be served stale after an update. It also
+ * means a wrong path fails the build rather than the page.
+ *
+ * swap, because the first paint should show the text in a fallback rather than
+ * nothing at all; a font is worth waiting for only when it has already arrived.
+ */
+@font-face {
+  font-family: "iA Writer Mono";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/ia/iAWriterMonoV.woff2") format("woff2");
+}
+@font-face {
+  font-family: "iA Writer Mono";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/ia/iAWriterMonoV-Italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "iA Writer Duo";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/ia/iAWriterDuoV.woff2") format("woff2");
+}
+@font-face {
+  font-family: "iA Writer Duo";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/ia/iAWriterDuoV-Italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "iA Writer Quattro";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/ia/iAWriterQuattroV.woff2") format("woff2");
+}
+@font-face {
+  font-family: "iA Writer Quattro";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/ia/iAWriterQuattroV-Italic.woff2") format("woff2");
+}
+
 @theme static {
-  --font-inter: "Inter";
-  --font-mono: "iA Writer Mono";
-  --font-duo: "iA Writer Duo";
-  --font-quattro: "iA Writer Quattro";
+  /* Each family names what it should fall back to, because naming a family on
+     its own replaces Tailwind's stack rather than extending it: font-mono would
+     then have no monospace behind it at all, and a listing whose font failed to
+     load would set itself in whatever proportional face it inherited.
+     Quattro falls back to a sans rather than a mono — it is the proportional one
+     of the three, and it is meant for prose. */
+  --font-inter: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "iA Writer Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-duo: "iA Writer Duo", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-quattro: "iA Writer Quattro", ui-sans-serif, system-ui, sans-serif;
 
   --text-shadow-outline-black: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
   --text-shadow-outline-black-thin: -0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000;

@@ -41,13 +41,20 @@
     <div class="relative grow">
       <slot />
     </div>
+
+    <!-- The family app's footer, for somebody who has a family app to go back
+         to. A pool player sees the page exactly as it was. -->
+    <Footer v-if="beyondThePool" />
   </div>
 </template>
 
 <script setup lang="ts">
-// The pool's own chrome, deliberately not the family app's: no link back into
-// the rest of the site, and a sign-out that ends the pool's session and not the
-// family one. They share an origin and nothing else.
+// The pool's own chrome, deliberately not the family app's: nothing in these two
+// bars leads out of the pool, and the sign-out in them ends the session for both
+// at once, because there is only one.
+//
+// The one exception is at the very bottom, and only for an account that has
+// somewhere else to go — see beyondThePool.
 //
 // Two bars, and which menu belongs to which is the point of having two. The
 // header over the grass is the pool itself — the same on every page whatever
@@ -58,6 +65,22 @@
 // tippers makes it, and clamping it in the layout would push the columns the
 // page exists to show off the side.
 const { edition, registration, signedIn } = useGhtSession()
+
+// Whether this account is more than a pool player.
+//
+// A pool account is *confined*: the server hands it exactly one area, the pool
+// itself, and refuses it everywhere else. So an account entitled to anything
+// besides the pool is one that reached this page from a family app it can go
+// back to, and the footer is that way back — a column of areas, which for
+// anybody else would list nothing and offer doors that bounce them.
+//
+// Read from the entitlements rather than from a flag saying "confined", because
+// this asks the question the footer actually answers: is there anywhere else
+// for this person to go? Someone unconfined but entitled to nothing else is, as
+// far as this page is concerned, a pool player.
+const { entitled } = useModules()
+
+const beyondThePool = computed(() => entitled.value.some(area => area !== 'geheimtipp'))
 
 const navigation = [
   { label: 'Tipprunde', to: '/geheimtipp' },

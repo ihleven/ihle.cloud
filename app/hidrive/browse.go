@@ -276,7 +276,17 @@ func (a *API) Media(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	asked := path(r)
+	return serveSigned(w, r, d, a.urls, path(r))
+}
+
+// serveSigned hands the request to the store, at a short-lived URL it signs for
+// us, and retries once if the store has stopped honouring the one we kept.
+//
+// Shared by the browser and the library because the difference between them is
+// only which drive resolves the path: the minting, the cache, the proxy and the
+// single retry are the same, and having them once means a fix to the retry is a
+// fix everywhere.
+func serveSigned(w http.ResponseWriter, r *http.Request, d *hi.Drive, urls *signedURLs, asked string) error {
 	key := d.Resolve(asked)
 
 	mint := func() (*url.URL, error) {
@@ -284,35 +294,37 @@ func (a *API) Media(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return nil, err
 		}
-		a.urls.put(key, signed)
+		urls.put(key, signed)
 
 		return signed, nil
 	}
 
-	signed, cached := a.urls.get(key)
+	signed, cached := urls.get(key)
 	if !cached {
+		var err error
 		if signed, err = mint(); err != nil {
 			return err
 		}
 	}
 
-	if !a.proxy(w, r, signed) {
+	if !proxyTo(w, r, signed) {
 		return nil
 	}
 
 	// The URL was reused and the store has stopped honouring it. Nothing has
 	// been written yet — that is what makes this recoverable — so mint a fresh
 	// one and go again, once.
-	a.urls.drop(key)
+	urls.drop(key)
 	if !cached {
 		// Freshly minted and already refused: retrying would ask the same
 		// question twice.
 		return errs.New("the store refused a newly signed URL", errs.HTTPStatus(http.StatusBadGateway))
 	}
-	if signed, err = mint(); err != nil {
+	signed, err := mint()
+	if err != nil {
 		return err
 	}
-	if a.proxy(w, r, signed) {
+	if proxyTo(w, r, signed) {
 		return errs.New("the store refused a newly signed URL", errs.HTTPStatus(http.StatusBadGateway))
 	}
 
@@ -341,12 +353,23 @@ func staleStatus(code int) bool {
 //
 // The request is cloned per attempt because the proxy rewrites what it is
 // given, and a second attempt has to start from the caller's original.
-func (a *API) proxy(w http.ResponseWriter, r *http.Request, signed *url.URL) (stale bool) {
+func proxyTo(w http.ResponseWriter, r *http.Request, signed *url.URL) (stale bool) {
 	attempt := r.Clone(r.Context())
-	attempt.URL.Host, attempt.URL.Scheme, attempt.Host = signed.Host, signed.Scheme, signed.Host
 	attempt.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
 
-	proxy := httputil.NewSingleHostReverseProxy(signed)
+	proxy := &httputil.ReverseProxy{
+		// Ask for the URL that was signed, and nothing else. The obvious
+		// httputil.NewSingleHostReverseProxy joins the incoming path onto the
+		// target's, so the store would be asked for the signature followed by
+		// /api/v1/retro/media/… — a path nobody signed. HiDrive answers it
+		// anyway; a store that reads the whole path would not, and we would be
+		// relying on a leniency nothing promises.
+		Director: func(req *http.Request) {
+			target := *signed
+			req.URL = &target
+			req.Host = signed.Host
+		},
+	}
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		if staleStatus(resp.StatusCode) {
 			stale = true

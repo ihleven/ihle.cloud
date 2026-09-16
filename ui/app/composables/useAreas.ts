@@ -12,6 +12,7 @@ const areas = [
   { module: 'kalender', icon: 'i-lucide-calendar', label: 'Kalender', to: '/kalender' },
   { module: 'hidrive', icon: 'i-lucide-hard-drive', label: 'Dateien', to: '/hidrive' },
   { module: 'mediathek', icon: 'i-lucide-library', label: 'Mediathek', to: '/mediathek' },
+  { module: 'retro', icon: 'i-lucide-newspaper', label: 'Zeitschriften', to: '/retro' },
   { module: 'musik', icon: 'i-lucide-music', label: 'Musik', to: '/musik' },
   { module: 'search', icon: 'i-feather-search', label: 'Search', to: '/search' },
   { module: 'admin', icon: 'i-lucide-shield', label: 'Konten', to: '/admin' },

@@ -30,7 +30,6 @@ func init() {
 	modules.Define("content", "Der Inhalts-Editor.")
 	modules.Define("familie", "Stammbaum und Personen.")
 	modules.Define("kalender", "Der Kalender.")
-	modules.Define("musik", "Die Musik.")
 	modules.Define("search", "Die Suche.")
 }
 
@@ -56,11 +55,29 @@ var Mediathek = modules.Define(MediathekArea, "Die Mediathek.")
 // MediathekArea is the area's id, as the session reports it.
 const MediathekArea = "mediathek"
 
+// Retro gates the magazine archive. One fixed shelf like the Mediathek, and a
+// separate entitlement for the same reason: reading old computer magazines and
+// watching the family's videos are different permissions, and neither follows
+// from the other.
+var Retro = modules.Define(RetroArea, "Das Zeitschriften-Archiv.")
+
+// RetroArea is the area's id, as the session reports it.
+const RetroArea = "retro"
+
 // HidriveArea is the area's id, as the session reports it. Named because the
 // session withholds this one area from an account that has no storage to
 // browse, and comparing against a literal there would be a second place to keep
 // the spelling right.
 const HidriveArea = "hidrive"
+
+// Musik gates the music shelf. Its own entitlement for the reason the
+// mediathek and the archive have theirs: one fixed shelf, checked on the
+// server, and listening to the family's albums does not follow from watching
+// its films.
+var Musik = modules.Define(MusikArea, "Die Musik.")
+
+// MusikArea is the area's id, as the session reports it.
+const MusikArea = "musik"
 
 // Geheimtipp says that an account plays in the pool.
 //

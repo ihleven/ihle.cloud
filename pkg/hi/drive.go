@@ -105,6 +105,36 @@ func (d *Drive) Dir(ctx context.Context, p string) (*Meta, error) {
 	return d.client.Dir(ctx, token, d.Resolve(p))
 }
 
+// Search lists what is below a path on this drive, at any depth. See
+// (*Client).Search for how the hits are selected and what they cost.
+//
+// The hits carry absolute paths, which is to say they name the drive's own
+// layout including the root this drive is scoped to. A caller handing them
+// outwards puts them back below the root with Below.
+func (d *Drive) Search(ctx context.Context, p, pattern, category string) ([]Meta, error) {
+	token, err := d.token()
+	if err != nil {
+		return nil, err
+	}
+
+	return d.client.Search(ctx, token, d.Resolve(p), pattern, category)
+}
+
+// Below reports an absolute drive path relative to this drive's root, so that
+// what a caller receives is addressed the same way as what it asked for.
+//
+// A path that is not below the root comes back unchanged and still absolute,
+// which reads as what it is — something outside this drive, that no relative
+// address can name.
+func (d *Drive) Below(p string) string {
+	rooted := strings.TrimSuffix(d.cfg.Root, "/")
+	if rooted == "" || !strings.HasPrefix(p, rooted+"/") {
+		return p
+	}
+
+	return strings.TrimPrefix(p, rooted+"/")
+}
+
 // URL returns a pre-signed URL for a file on this drive.
 func (d *Drive) URL(ctx context.Context, p string) (*url.URL, error) {
 	token, err := d.token()

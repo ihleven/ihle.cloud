@@ -4,10 +4,10 @@ import { dirname, join } from 'node:path'
 // The geheimtipp pool, as a layer of its own.
 //
 // It is a separate site that happens to be served by this binary: its own users
-// in its own database, its own sign-in, and nothing of the family app's chrome
-// or entitlements around it. Someone with an account here has none there, and
-// the reverse. Keeping it in a layer is what stops the two leaking into each
-// other.
+// in its own database, and none of the family app's chrome around it — save the
+// footer, which appears only for an account entitled to more than the pool and
+// is the one way back out. Keeping it in a layer is what stops the two leaking
+// into each other.
 //
 // Components are registered from WITHIN the layer using an absolute path derived
 // from import.meta.url: a layer's own ~/ alias does not resolve to its app/

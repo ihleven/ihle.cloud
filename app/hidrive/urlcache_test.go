@@ -62,11 +62,10 @@ func TestAStaleResponseWritesNothing(t *testing.T) {
 	}))
 	defer store.Close()
 
-	api := NewAPI(token("t"), Shared{Alias: "a", Root: "/"})
 	signed, _ := url.Parse(store.URL + "/signed/path")
 
 	w := httptest.NewRecorder()
-	if stale := api.proxy(w, httptest.NewRequest(http.MethodGet, "/x", nil), signed); !stale {
+	if stale := proxyTo(w, httptest.NewRequest(http.MethodGet, "/x", nil), signed); !stale {
 		t.Fatal("a 403 from the store was not recognised as a stale URL")
 	}
 	if w.Body.Len() != 0 {
@@ -85,11 +84,10 @@ func TestAGoodResponseIsNotTreatedAsStale(t *testing.T) {
 	}))
 	defer store.Close()
 
-	api := NewAPI(token("t"), Shared{Alias: "a", Root: "/"})
 	signed, _ := url.Parse(store.URL + "/signed/path")
 
 	w := httptest.NewRecorder()
-	if stale := api.proxy(w, httptest.NewRequest(http.MethodGet, "/x", nil), signed); stale {
+	if stale := proxyTo(w, httptest.NewRequest(http.MethodGet, "/x", nil), signed); stale {
 		t.Fatal("a good response was treated as a stale URL")
 	}
 	if w.Body.String() != "bytes" {
@@ -100,11 +98,10 @@ func TestAGoodResponseIsNotTreatedAsStale(t *testing.T) {
 // An unreachable store is a bad gateway, not a stale URL: re-minting would not
 // help, and swallowing it would answer an empty 200.
 func TestAnUnreachableStoreIsABadGateway(t *testing.T) {
-	api := NewAPI(token("t"), Shared{Alias: "a", Root: "/"})
 	signed, _ := url.Parse("http://127.0.0.1:1/signed/path")
 
 	w := httptest.NewRecorder()
-	if stale := api.proxy(w, httptest.NewRequest(http.MethodGet, "/x", nil), signed); stale {
+	if stale := proxyTo(w, httptest.NewRequest(http.MethodGet, "/x", nil), signed); stale {
 		t.Error("a transport failure was reported as a stale URL")
 	}
 	if w.Code != http.StatusBadGateway {

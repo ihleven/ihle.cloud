@@ -127,6 +127,17 @@ over the grass is the pool: the same on every page whatever edition is open, so
 the **account** menu sits there. The bar below is the **edition** — its pages,
 its name, and the registration this person plays it under.
 
+Below everything, and only sometimes, the **family app's footer**. A pool
+account is confined — the server hands it one area and refuses it everywhere
+else — so an account entitled to anything besides the pool is one that arrived
+here from a family app it can go back to, and the footer is that way back. For
+everybody else, including a visitor with no account, the page is unchanged: the
+footer is a column of areas, and for a pool player it would list none of them
+and offer doors that bounce whoever opens them.
+
+It reads entitlements rather than a "confined" flag, because that is the
+question it is actually asking — is there anywhere else for this person to go?
+
 ## Routes
 
 ### Ported

@@ -107,6 +107,7 @@ const tiles = computed(() => allowed([
   { module: 'hidrive', label: 'Dateien', to: '/hidrive', class: 'bg-amber-500/80' },
   { module: 'kalender', label: 'Kalender', to: '/kalender', class: 'bg-green-500/90' },
   { module: 'mediathek', label: 'Mediathek', to: '/mediathek', class: 'bg-sky-500/80' },
+  { module: 'retro', label: 'Zeitschriften', to: '/retro', class: 'bg-cyan-500/80' },
   { module: 'musik', label: 'Musik', to: '/musik', class: 'bg-cyan-300/80' },
   { module: 'geheimtipp', label: 'Geheimtipp', to: '/geheimtipp', class: 'bg-sky-400/80' },
 ]))
