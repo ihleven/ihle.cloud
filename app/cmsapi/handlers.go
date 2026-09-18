@@ -119,9 +119,19 @@ func EntryLookup(mngr *mgmt.Mngr) func(http.ResponseWriter, *http.Request) error
 // EntryUpdate writes an entry back.
 //
 // `mode=validate` parses and checks without writing; `mode=force` accepts an
-// entry whose bytes do not round-trip exactly. Committing and reindexing are now
-// one call — mgmt.SaveChangeset — which also means an indexing failure after a
-// successful commit is reported as a warning rather than failing the write.
+// entry whose bytes do not round-trip exactly.
+//
+// The CMS separates saving from publishing: a save records the work on a
+// reference of the editor's own and the served branch does not move until
+// somebody publishes it. This app has no draft step — one person edits, presses
+// save, and expects the site to change — so it does both in the one request,
+// staging at the head because it read the entry and rewrote it in the same
+// breath and so has no earlier revision to have based the change on.
+//
+// Publishing reports what it could not do afterwards, such as failing to
+// reindex, as messages rather than as a failed write: the change is committed
+// and pushed by then, and calling that an error would invite a second save that
+// would only repeat it.
 func EntryUpdate(mngr *mgmt.Mngr) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		now := time.Now()
@@ -160,7 +170,12 @@ func EntryUpdate(mngr *mgmt.Mngr) func(http.ResponseWriter, *http.Request) error
 			return err
 		}
 
-		warnings, err := mngr.SaveChangeset(changeset, usr.Signature, r.URL.Query().Get("msg"), now)
+		draft, err := mngr.StageAtHead(changeset, usr, r.URL.Query().Get("msg"), now)
+		if err != nil {
+			return err
+		}
+
+		_, warnings, err := mngr.PublishDraft(r.Context(), usr, draft.Ref, now)
 		if err != nil {
 			return err
 		}

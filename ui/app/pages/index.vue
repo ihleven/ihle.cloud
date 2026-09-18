@@ -36,15 +36,29 @@
 
       <!-- Only the areas this account is entitled to. Someone who may see one
            thing gets one tile, not a wall of doors that refuse to open. -->
-      <NuxtLink
-        v-for="tile in tiles"
-        :key="tile.label"
-        :to="tile.to"
-        class="block aspect-square p-8"
-        :class="tile.class"
-      >
-        <h1 class="text-lg font-black text-white hover:text-outline">{{ tile.label }}</h1>
-      </NuxtLink>
+      <template v-for="tile in tiles" :key="tile.label">
+        <!-- The calendar tile is the calendar's own date block rather than a
+             label: it says what day it is, and each part of the date is a way
+             into the page for that part. Which is why it cannot be one link
+             like the others — an anchor inside an anchor is not a thing a
+             browser will render. -->
+        <div
+          v-if="tile.module === 'kalender'"
+          class="aspect-square p-4 sm:p-6"
+          :class="tile.class"
+        >
+          <KalenderHero variant="tile" />
+        </div>
+
+        <NuxtLink
+          v-else
+          :to="tile.to"
+          class="block aspect-square p-8"
+          :class="tile.class"
+        >
+          <h1 class="text-lg font-black text-white hover:text-outline">{{ tile.label }}</h1>
+        </NuxtLink>
+      </template>
 
       <p v-if="!tiles.length" class="col-span-full p-8 text-muted">
         Für dieses Konto ist noch nichts freigeschaltet.
@@ -105,10 +119,11 @@ const tiles = computed(() => allowed([
   { module: 'filme', label: 'Super 8', to: '/filme', class: 'bg-rose-500/80' },
   { module: 'familie', label: 'Familie', to: '/famihlie', class: 'bg-violet-500/80' },
   { module: 'hidrive', label: 'Dateien', to: '/hidrive', class: 'bg-amber-500/80' },
-  { module: 'kalender', label: 'Kalender', to: '/kalender', class: 'bg-green-500/90' },
+  { module: 'kalender', label: 'Kalender', to: '/kalender', class: 'tile-kalender' },
   { module: 'mediathek', label: 'Mediathek', to: '/mediathek', class: 'bg-sky-500/80' },
   { module: 'retro', label: 'Zeitschriften', to: '/retro', class: 'bg-cyan-500/80' },
   { module: 'musik', label: 'Musik', to: '/musik', class: 'bg-cyan-300/80' },
+  { module: 'djvet', label: 'DJ-Sets', to: '/djvet', class: 'tile-oscillate' },
   { module: 'geheimtipp', label: 'Geheimtipp', to: '/geheimtipp', class: 'bg-sky-400/80' },
 ]))
 </script>
@@ -131,6 +146,108 @@ const tiles = computed(() => allowed([
   .ght-door {
     background-color: #000;
     color: #fff;
+  }
+}
+
+/* The calendar tile is the whole green ramp, pale at the top and deep at the
+   foot, so the square reads as one colour with depth rather than a flat fill.
+
+   Every green main.css defines is in it. Green 500 is not one of them — the
+   file runs 50 to 950 and leaves 500 to Tailwind's own palette — so ral-5000
+   stands in that slot, which is where it belongs: #00C16A falls exactly between
+   green-400 and green-600, and is plainly the 500 the ramp was written around.
+
+   The date sits in the middle of the square and so on the middle of the ramp,
+   but the ends run from near-white to near-black, which is why everything on
+   this tile is drawn with the outline: it is the one treatment that survives
+   both.
+
+   The ramp drifts down the tile and back, a full sweep taking twenty-four
+   seconds — slower than the DJ tile, because a calendar is a quieter thing to
+   look at and the two sitting in the same grid should not appear to be keeping
+   time with each other.
+
+   It travels from 30% rather than from the top, and the gradient box is a
+   little over twice the tile rather than three times. Both are the same
+   constraint: the palest greens have to stay up in the corner. Swept under the
+   date they leave white letters on near-white, held together by half a pixel of
+   outline, which is legible in the way a thing can be legible and still not be
+   worth reading. */
+.tile-kalender {
+  background-image: linear-gradient(
+    160deg,
+    var(--color-green-50) 0%,
+    var(--color-green-100) 10%,
+    var(--color-green-200) 20%,
+    var(--color-green-300) 30%,
+    var(--color-green-400) 40%,
+    var(--color-ral-5000) 50%,
+    var(--color-green-600) 60%,
+    var(--color-green-700) 70%,
+    var(--color-green-800) 80%,
+    var(--color-green-900) 90%,
+    var(--color-green-950) 100%
+  );
+  background-size: 100% 220%;
+
+  /* Stated rather than left at the default, because it is also what shows when
+     the animation is turned off below: 0% 0% would park the tile on exactly the
+     pale end the sweep is arranged to avoid. */
+  background-position: 50% 65%;
+  animation: tile-kalender 24s ease-in-out infinite alternate;
+}
+
+@keyframes tile-kalender {
+  from {
+    background-position: 50% 30%;
+  }
+
+  to {
+    background-position: 50% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-kalender {
+    animation: none;
+  }
+}
+
+/* The DJ tile does not sit still: a gradient far wider than the tile, drifting
+   back and forth across it. Slow on purpose — eighteen seconds one way — so it
+   reads as the tile being alive rather than as something demanding attention,
+   and `alternate` makes it turn round rather than snap back to the start.
+
+   The stops run indigo to magenta and back, so the drift returns where it
+   started and the turn is not a place where the colour jumps. Every one of them
+   is dark enough to carry the white label at every point of the drift, which is
+   the constraint that picked them.
+
+   Twice the tile rather than three times: at 135 degrees the far stops sit in
+   the corners, and a narrower window never brings them into view — a colour
+   written here that never reaches the screen would be a colour in name only. */
+.tile-oscillate {
+  background-image: linear-gradient(135deg, #4f46e5 0%, #7c3aed 30%, #c026d3 55%, #7c3aed 80%, #4f46e5 100%);
+  background-size: 200% 200%;
+  animation: tile-oscillate 18s ease-in-out infinite alternate;
+}
+
+@keyframes tile-oscillate {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+/* An animation that never ends is precisely what this setting is asked for.
+   The colours stay — only the drifting stops, so the tile still looks like
+   itself. */
+@media (prefers-reduced-motion: reduce) {
+  .tile-oscillate {
+    animation: none;
   }
 }
 

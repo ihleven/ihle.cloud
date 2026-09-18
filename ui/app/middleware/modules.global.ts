@@ -14,6 +14,8 @@ const AREA_BY_PREFIX: Record<string, string> = {
   '/kalender': 'kalender',
   '/mediathek': 'mediathek',
   '/musik': 'musik',
+  '/djvet': 'djvet',
+  '/retro': 'retro',
   '/search': 'search',
   '/admin': 'admin',
 }

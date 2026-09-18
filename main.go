@@ -78,7 +78,8 @@ type Flags struct {
 	MediathekRoot string `arg:"--mediathek-root, env:MEDIATHEK_ROOT" placeholder:"PATH" help:"directory the shared video library resolves against. Its own root, not the media or drive one, so a bug in either route cannot reach the other's files. Unset disables the mediathek routes"`
 
 	RetroRoot   string `arg:"--retro-root, env:RETRO_ROOT" placeholder:"PATH" help:"directory the magazine archive resolves against, on the same reasoning as the mediathek root: its own, so neither can reach the other's files. Unset disables the retro routes"`
-	MusikRoot   string `arg:"--musik-root, env:MUSIK_ROOT" placeholder:"PATH" help:"directory the music shelf resolves against, on the same reasoning as the mediathek root: its own, so neither can reach the other's files. Unset disables the musik routes"`
+	MusikRoot   string `arg:"--musik-root, env:MUSIK_ROOT" default:"/public/alben" placeholder:"PATH" help:"directory the music shelf resolves against, on the same reasoning as the mediathek root: its own, so neither can reach the other's files. Unset disables the musik routes"`
+	DjvetRoot   string `arg:"--djvet-root, env:DJVET_ROOT" default:"/public/djvet" placeholder:"PATH" help:"directory the DJ archive resolves against, on the same reasoning as the mediathek root: its own, so neither can reach the other's files. Unset disables the djvet routes"`
 	DataDir     string `arg:"--data-dir,     env:DATA_DIR"         default:"data" placeholder:"DIR"`
 	SearchLevel string `arg:"--search-level, env:SEARCH_LEVEL"     default:"basic" help:"Search level: off,basic,fulltext,extended" placeholder:"LEVEL"`
 	SearchDir   string `arg:"--search-dir,   env:SEARCH_DIR"       default:"bleve" help:"Dirname of on disk search index, relative to the data dir" placeholder:"DIR"`
@@ -253,6 +254,16 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		)
 	}
 
+	// The DJ archive: sets rather than albums, arranged in series, and its own
+	// root for the reason the others have theirs.
+	var djvet *hidrive.Library
+	if flags.MediaAlias != "" && flags.DjvetRoot != "" {
+		djvet = hidrive.NewLibrary(
+			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.DjvetRoot}, nil),
+			slog.Default(),
+		)
+	}
+
 	authsvc, err := openAuth(context.Background(), pg, site, flags)
 	if err != nil {
 		log.Fatal("openAuth: ", err)
@@ -406,6 +417,14 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/musik/tags/{path...}   ", requireMusik(authsvc, musik.Tags)),
 		route("  GET  /api/v1/musik/thumb/{path...}  ", requireMusik(authsvc, musik.Thumbnail)),
 		route("  GET  /api/v1/musik/stream/{path...} ", requireMusik(authsvc, musik.Stream)),
+		// The DJ archive. The same five as the music shelf, because it is the
+		// same kind of thing read the same way: a tree of folders holding audio,
+		// pictures beside it, and tags inside the files.
+		route("  GET  /api/v1/djvet/meta/{path...}   ", requireDjvet(authsvc, djvet.Meta)),
+		route("  GET  /api/v1/djvet/search/{path...} ", requireDjvet(authsvc, djvet.Search)),
+		route("  GET  /api/v1/djvet/tags/{path...}   ", requireDjvet(authsvc, djvet.Tags)),
+		route("  GET  /api/v1/djvet/thumb/{path...}  ", requireDjvet(authsvc, djvet.Thumbnail)),
+		route("  GET  /api/v1/djvet/stream/{path...} ", requireDjvet(authsvc, djvet.Stream)),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),

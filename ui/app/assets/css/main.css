@@ -288,3 +288,12 @@
 
     /* text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; */
   }
+
+
+/* .focus-ring {
+  @apply focus:outline-none focus:ring-4 focus:ring-sky-400 active:ring-3 active:ring-sky-300 ;
+} */
+
+/* .focus-inset-ring {
+  @apply focus:outline-none focus:ring-4 focus:ring-sky-400 active:ring-3 active:ring-sky-300 ;
+} */

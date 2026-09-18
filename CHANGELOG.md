@@ -13,6 +13,37 @@ This file starts here; anything before the entries below is only in the git hist
 
 ### Added
 
+- **Bildweise durch einen Film**: under the player there are now four handles — a second back, a frame back, a frame forward, a second forward — with the position beside them written to the frame rather than to the second. It is for landing on an exact moment, which is what a scene's start time has to be, and pressing one pauses the film first: stepping a frame at a time while it is still running is not stepping.
+
+  A frame here is a real frame. Super 8 ran at 18 pictures a second, so one lasts 0.0556 seconds, not the 0.05 the old buttons used — close enough to look right and wrong by a whole frame every eighteen presses. Films in a format whose rate is not recorded get no frame handles at all rather than handles that step the wrong distance.
+
+- **Super-8-Filme laufen von selbst los**: a Super-8 film now starts playing as soon as its page opens, as it did in the old app. It was shot on silent stock, so there is nothing to hear and nothing to be startled by — which is also the reason a browser allows it to start at all, since browsers will only begin playing what makes no sound. Films in any other format wait to be asked, because a format with sound is a different question and the field that records the format exists precisely so it can be answered separately.
+
+
+- **Der Kalender ist wieder erreichbar**: the front page has offered a Kalender tile and the menu a Kalender entry for some time, and both led to a page that did not exist. The frame is now there: a green band saying what day it is — the month, the calendar week, the year, the day and the weekday — with each part a link to the page for that part, and routes for a year, a month, a day and an ISO week nested inside it.
+
+  There is a date picker beside the band, too — pick a day and it goes to that day, page to another month and it goes to that month. The old page had reached for one and never got it: it referenced a calendar library that was not installed, so that half of the band simply stayed empty. This one is the component the app already ships.
+
+  What those four pages show is still a placeholder naming the part of the date it was reached by, exactly as the earlier, abandoned attempt left them. That is deliberate: they mark where the work resumes rather than pretending to be a calendar.
+
+  Two things the old version got wrong are fixed on the way. The month link pointed at the month before it, because it used the computer's month numbering, where January is zero. And the calendar week never appeared at all — the value it was read from had been left as the word "tag" — so the week pages could not be reached from anywhere. The week is now worked out properly, including the awkward days at the turn of the year, where the last days of December can belong to the first week of the next year and the first days of January to the last week of the previous one.
+
+- **Die Kalender-Kachel zeigt das Datum**: the tile on the front page is no longer a green square with a word on it — it shows today exactly as the calendar page does, in a size that suits a tile, and each part of the date leads to the same page it leads to there. It is the calendar's own block rather than a copy of it, so the two cannot come to disagree about what day it is.
+
+  Its background is the whole green scale the stylesheet defines rather than one green out of it: pale at the top, deep at the foot, so the square has depth instead of being a flat fill, and the whole ramp drifts slowly down the tile and back. Everything written on it is outlined, which is what lets the same text sit legibly across that range. For anyone who has asked their system not to animate things, the colours stay and the drifting stops.
+
+
+- **Die DJ-Sets sind wieder da**: the mix series on the family storage can be listened to in the app. The overview shows each series as a row of sleeves that scrolls sideways and comes to rest on a whole CD rather than between two; a series opens as a wall of its CDs, and a CD shows what is on it beside its sleeve and the photograph of its tracklist. The titles come from inside the files — these were written with their names in them — and fall back to the filenames, which in this collection are frequently a number and nothing else.
+
+  The old page for this never worked: it asked an address that no longer exists, so it drew an empty list between two broken images, and each track linked to the file browser rather than playing. The layout was right, and is what has been rebuilt around.
+
+  Access is its own permission, `djvet`, rather than the music one: the two are different collections, and being allowed to hear the family's records says nothing about who should hear its sets. Which folder holds them is the `DJVET_ROOT` setting, its own again, so a mistake in one set of routes cannot reach what another serves.
+
+- **Angefangene Musik läuft weiter, wenn man weiterklickt**: the player used to live on the music page, so leaving it stopped the sound mid-track. It now sits outside the pages entirely — start an album, walk off to the magazines or the films, and it keeps playing. On the music and DJ pages it is the full bar along the bottom, with the sleeve, what is playing and the way to the next track; everywhere else it shrinks to a small pill in the corner, out of the way but still one click from silence. Nothing at all exists until something is played, so a visit that plays nothing costs nothing.
+
+  What it plays is now a list rather than a single track, which is what lets it go on to the next one by itself: before, finding the next track meant searching the page that had been left behind.
+
+
 - **Der Footer erscheint jetzt auch in der Tipprunde — aber nur für Familienkonten**: someone who reaches the pool from the rest of the app now finds the usual footer at the bottom of it, which is the way back: the areas they may visit, their session, their account settings. For a pool player the page is exactly as it was. That is not a cosmetic distinction — a pool account is *confined*, meaning the server grants it the pool and refuses it everywhere else, so a footer would have shown them an empty list of areas and a set of links that bounce whoever clicks them. The test is whether the account is entitled to anything besides the pool, which is the question the footer actually answers: is there somewhere else for this person to go? A visitor with no account sees no footer either.
 
 - **Die Musik ist wieder da**: the albums on the family storage can be played in the app again — a wall of sleeves, nothing else, because an album is recognised by its cover and the name of every one of them at once is noise. The bar above the wall carries the way back, a filter, and a slider that sets how large a cover is; an album opens over the wall rather than on a page of its own, showing its sleeve and, under it, what is on it, and closing it puts you back where you were looking. The play button on a sleeve starts the album, a track in the open window starts there, and what is playing keeps playing while you carry on browsing.

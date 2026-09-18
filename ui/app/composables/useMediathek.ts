@@ -219,3 +219,37 @@ function episodeTitle(name: string, numberPrefix?: string): string {
 function bestFirst(a: DriveMeta, b: DriveMeta): number {
   return (b.size ?? 0) - (a.size ?? 0)
 }
+
+const unused_medien = [
+  { dir: 'captain-future' },
+  // {
+  //   name: 'Die Erben der Saurier',
+  //   dir: 'Die-Erben-der-Saurier',
+  //   link: '/mediathek/Die-Erben-der-Saurier/1.1-Eine-neue-Zeit',
+  //   img: '/public/mediathek/Die-Erben-der-Saurier/cover.jpg',
+  //   class: "bg-[url('http://localhost:8000/hi/media/public/mediathek/Die-Erben-der-Saurier/cover.jpg')]",
+  // },
+  { dir: '2001-walking-with-beasts', titel: 'Die Erben der Saurier', orig: 'Walking with Beasts', jahr: 2001 },
+  {
+    dir: '2003-walking-with-cavemen',
+    titel: 'Im Reich der Urmenschen',
+    orig: 'Walking with Cavemen',
+    jahr: 2003,
+  },
+  {
+    dir: '2003-sea-monsters',
+  },
+  {
+    dir: '2003-monsters-we-met', titel: 'Menschen gegen Monster', orig: 'Monsters We Met', jahr: 2003,
+  },
+  {
+    dir: '2005-walking-with-monsters', titel: 'Die Ahnen der Saurier', orig: 'Walking with Monsters', jahr: 2005,
+  },
+  {
+    dir: '2011-planet-of-the-apemen',
+    titel: 'Kampf der Menschenaffen',
+    orig: 'Planet of the Apemen: Battle for Earth',
+    jahr: 2011,
+  },
+  { dir: '2013-ice-age-giants', orig: 'Ice Age Giants', jahr: 2013 },
+]

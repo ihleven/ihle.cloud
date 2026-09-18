@@ -14,6 +14,7 @@ const areas = [
   { module: 'mediathek', icon: 'i-lucide-library', label: 'Mediathek', to: '/mediathek' },
   { module: 'retro', icon: 'i-lucide-newspaper', label: 'Zeitschriften', to: '/retro' },
   { module: 'musik', icon: 'i-lucide-music', label: 'Musik', to: '/musik' },
+  { module: 'djvet', icon: 'i-lucide-disc-3', label: 'DJ-Sets', to: '/djvet' },
   { module: 'search', icon: 'i-feather-search', label: 'Search', to: '/search' },
   { module: 'admin', icon: 'i-lucide-shield', label: 'Konten', to: '/admin' },
 ]

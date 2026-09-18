@@ -79,6 +79,14 @@ var Musik = modules.Define(MusikArea, "Die Musik.")
 // MusikArea is the area's id, as the session reports it.
 const MusikArea = "musik"
 
+// Djvet gates the DJ archive. Its own entitlement rather than the music one:
+// the two are different collections with different audiences, and a shelf of
+// the family's records says nothing about who should hear its sets.
+var Djvet = modules.Define(DjvetArea, "Die DJ-Sets.")
+
+// DjvetArea is the area's id, as the session reports it.
+const DjvetArea = "djvet"
+
 // Geheimtipp says that an account plays in the pool.
 //
 // The pool now shares this app's sign-in: an account here is how someone gets

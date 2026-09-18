@@ -168,6 +168,12 @@ func requireMusik(svc authenticator, h func(http.ResponseWriter, *http.Request) 
 	return requireModule(svc, cmsauth.Musik, "the music shelf requires the musik entitlement", h)
 }
 
+// requireDjvet gates the DJ archive, on its own entitlement for the reason the
+// mediathek has one.
+func requireDjvet(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return requireModule(svc, cmsauth.Djvet, "the DJ archive requires the djvet entitlement", h)
+}
+
 // requireRetro gates the magazine archive, on its own entitlement for the
 // reason the mediathek has one.
 func requireRetro(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {

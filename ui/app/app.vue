@@ -6,6 +6,13 @@
     </NuxtLayout>
     <div v-else class="absolute inset-0 bg-[url(/Summer-Leaves.jpg)]" />
 
+    <!-- Outside the layout on purpose. There are several layouts and a layer
+         brings its own, so a player rendered by one of them would be torn down
+         and rebuilt on the way between them — which stops the music. Here
+         nothing about navigating can reach it. It draws nothing until something
+         is played. -->
+    <Player />
+
     <UModal
       :open="!session && !isPublic"
       title="Login"

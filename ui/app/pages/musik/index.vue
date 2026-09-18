@@ -113,7 +113,6 @@
       v-else
       ref="wall"
       class="grid gap-2 p-2"
-      :class="{ 'pb-16': playing }"
       :style="{ gridTemplateColumns: `repeat(auto-fill, minmax(${tile}px, 1fr))` }"
     >
       <li
@@ -238,7 +237,7 @@
               v-for="(item, index) in listed"
               :key="item.path"
               class="flex items-baseline gap-2 py-1.5"
-              :class="{ 'text-primary': item.path === playing?.path }"
+              :class="{ 'text-primary': item.path === current?.id }"
             >
               <span class="w-5 shrink-0 text-right text-xs text-muted tabular-nums">
                 {{ item.number ?? index + 1 }}
@@ -246,7 +245,7 @@
               <button
                 type="button"
                 class="min-w-0 grow cursor-pointer text-left hover:text-primary"
-                @click="play(item.track)"
+                @click="playFrom(index)"
               >
                 <span class="block truncate text-sm text-highlighted">{{ item.title }}</span>
                 <!-- What the file says about itself, under what it is called —
@@ -269,31 +268,6 @@
       </template>
     </UModal>
 
-    <!-- What is playing, kept out of the way and out of the modal: closing the
-         album should not stop the music. -->
-    <div
-      v-if="playing"
-      class="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-accented bg-default px-2 py-1"
-    >
-      <span class="min-w-0 grow truncate text-xs text-muted">{{ playing.title }}</span>
-      <audio
-        ref="player"
-        :src="tracks(playing.path)"
-        controls
-        autoplay
-        preload="none"
-        class="h-8 max-w-md grow"
-        @ended="next"
-      />
-      <UButton
-        size="xs"
-        variant="ghost"
-        color="neutral"
-        icon="i-lucide-x"
-        aria-label="Wiedergabe beenden"
-        @click="playing = undefined"
-      />
-    </div>
   </article>
 </template>
 
@@ -309,6 +283,10 @@
 // The two ways of reading the shelf are switchable rather than chosen, because
 // which one is better depends on how the shelf grows. See useMusik.
 const { shelf: load, cover: covers, track: tracks, tags: readTags } = useMusik()
+
+// The player is the app's, not this page's: an album goes on playing while you
+// walk off to the magazines. See usePlayer.
+const { current, play } = usePlayer()
 
 const strategies: { value: Strategy, label: string, hint: string }[] = [
   { value: 'dir', label: 'Ordner', hint: 'Ein Verzeichnis pro Anfrage, alle gleichzeitig — schnell, aber viele' },
@@ -370,7 +348,6 @@ const tile = ref(160)
 const coverWidth = computed(() =>
   [200, 320, 480, 640].find(width => width >= tile.value * 2) ?? 640)
 const opened = ref<Album | undefined>()
-const playing = ref<Track | undefined>()
 
 /**
  * The years to offer, which are the years the *folders* carry.
@@ -404,10 +381,6 @@ const detailsOpen = computed({
     if (!open) opened.value = undefined
   },
 })
-
-function play(item: Track) {
-  playing.value = item
-}
 
 // What the files say about themselves, fetched when an album is opened and not
 // before: the wall shows no artists, so drawing it needs none of this, and
@@ -560,21 +533,40 @@ function describe(tag: MusikTags): string {
   return trackMeta(tag, header.value)
 }
 
+/**
+ * An album as something to play: finished URLs, in order.
+ *
+ * The addresses are resolved here because the player is shared with the DJ
+ * archive and knows about neither shelf. Handing over the whole album rather
+ * than the chosen track is what lets it go on to the next one after this page
+ * has been navigated away from.
+ */
+function queued(album: Album, titles?: { path: string, title: string, meta?: string }[]): PlayerTrack[] {
+  const said = new Map((titles ?? []).map(t => [t.path, t]))
+  const sleeve = album.cover ? covers(album.cover, 80) : undefined
+
+  return album.tracks.map(track => ({
+    id: track.path,
+    src: tracks(track.path),
+    // What the open window shows, where it is open: the tags are read only
+    // then, and a queue built from the wall has nothing better than the
+    // filename — which is what the wall itself is showing.
+    title: said.get(track.path)?.title || track.title,
+    subtitle: said.get(track.path)?.meta || album.title,
+    cover: sleeve,
+  }))
+}
+
 // Starts the album, and nothing else. The tile carries two handles because
 // they do two things: opening the window as well would make the quieter of the
 // two the only one that merely plays.
 function playAlbum(album: Album) {
-  const first = album.tracks[0]
-  if (first) play(first)
+  play(queued(album))
 }
 
-/** The next track of whichever album the one that just finished belongs to. */
-function next() {
-  const album = (shelf.value?.albums ?? []).find(a => a.tracks.some(t => t.path === playing.value?.path))
-  if (!album) return
-
-  const at = album.tracks.findIndex(t => t.path === playing.value?.path)
-  playing.value = album.tracks[at + 1]
+/** From one track of the open album onwards. */
+function playFrom(at: number) {
+  if (opened.value) play(queued(opened.value, listed.value), at)
 }
 
 /**
