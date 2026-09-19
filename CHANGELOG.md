@@ -9,6 +9,15 @@ This file starts here; anything before the entries below is only in the git hist
 
 ### Fixed
 
+- **Zeitschriften werden in der App gelesen**: installed on a phone, the app runs without Safari's bars — no address field, no back button, and no pulling down to reload. Opening a scan therefore replaced the app with the document and left nothing to return with: the only way back was to close the app altogether, which starts it again at the front page rather than where you were.
+
+  An issue now opens inside the app: the sheet slides up from the foot of the screen and covers everything, the app's own bar included, because reading a magazine is the whole screen's job. Its header says which issue it is and closes it again, and closing puts you back on the shelf exactly where you were standing.
+
+  Which reader opens an issue can be switched on the shelf — the app's own, or handing the file to the system viewer — so the two can be compared against real scans rather than argued about. Either way there is a way back: the system viewer is given a window of its own rather than this one, so the app is still standing behind it. The pages are drawn as they are reached rather than all at once, and only a handful are kept drawn at a time — a hundred pages held as pictures is more memory than a phone will give a web page. Nothing downloads the whole file either: only the pieces being looked at are fetched, which is what makes opening page one of a ninety-megabyte scan cost a page.
+
+- **Neu laden, wenn es sonst nichts gibt**: for the same reason — an installed app has no reload — the menu now offers one, and only there. A page that has got itself into a state can be reloaded where it stands instead of by closing the app and losing your place.
+
+
 - **Anyone could read the server's configuration file (security fix)**: the route that serves videos from a folder on the server built the filename by gluing the requested path onto the folder name. A request that spelled "go up one level" in its escaped form — which the web server passes through already unescaped — therefore reached files outside that folder, and the route requires no sign-in. The working directory is the one holding the application's settings file, so the session key, the single-sign-on secret, the image-service keys, the administrator token, the storage credentials and the database password were all readable by anyone who knew the address. The path is now opened through a mechanism that refuses to leave the folder at all, including by way of symbolic links, and anything outside it is reported as simply not found. **Every secret in that file should be treated as exposed and replaced.** Ordinary use of the route is unchanged.
 
 ### Added

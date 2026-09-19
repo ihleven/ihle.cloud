@@ -24,6 +24,8 @@ export interface Group {
 export interface Issue {
   /** The file, as it is stored. */
   name: string
+  /** Where it sits in the archive, which is what the reader route carries. */
+  path: string
   /** What to call it: the filename, less the magazine's own name and the .pdf. */
   title: string
   /** The year it appeared, where the filename says one. */

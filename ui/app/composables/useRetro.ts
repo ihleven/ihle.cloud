@@ -66,7 +66,7 @@ export function useRetro() {
         const title = issueTitle(dir, name)
         const { year, month, label } = dated(title)
 
-        return { name, title, year, month, label, size: m.size, cover: cover(path), href: issue(path) }
+        return { name, path, title, year, month, label, size: m.size, cover: cover(path), href: issue(path) }
       })
 
     const below = await Promise.all(
@@ -98,5 +98,5 @@ export function useRetro() {
     return [...here, ...below.flat()]
   }
 
-  return { shelf, meta, issue, cover }
+  return { shelf, meta, issue, cover, encodePath }
 }

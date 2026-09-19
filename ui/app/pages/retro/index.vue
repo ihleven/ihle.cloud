@@ -1,8 +1,29 @@
 <template>
   <article ref="page" class="min-h-full w-full bg-elevated">
-    <header class="flex items-baseline gap-2 px-3 py-2">
+    <header class="flex flex-wrap items-baseline gap-2 px-3 py-2">
       <h1 class="text-sm font-semibold text-highlighted">Zeitschriften</h1>
       <span v-if="issueCount" class="text-xs text-muted">{{ issueCount }} Ausgaben</span>
+
+      <div class="grow" />
+
+      <!-- Which reader opens an issue. Switchable rather than chosen, because
+           the two behave differently enough on a phone to be worth comparing
+           against real scans: the app's own keeps you inside it, the system's
+           is the one iOS draws and — installed — the one you cannot come back
+           from. -->
+      <div class="flex items-center gap-1">
+        <UButton
+          v-for="choice in readers"
+          :key="choice.value"
+          size="xs"
+          :variant="reader === choice.value ? 'solid' : 'ghost'"
+          :color="reader === choice.value ? 'primary' : 'neutral'"
+          :title="choice.hint"
+          @click="reader = choice.value"
+        >
+          {{ choice.label }}
+        </UButton>
+      </div>
     </header>
 
     <p v-if="pending" class="px-3 py-8 text-sm text-muted">Wird geladen…</p>
@@ -38,12 +59,16 @@
             :key="issue.name"
             class="w-32 shrink-0 snap-start sm:w-36"
           >
+            <!-- Written as a plain link to the file, which is what the
+                 system reader wants and what every browser already knows how
+                 to do. The app's reader takes the click instead. -->
             <a
               :href="issue.href"
               target="_blank"
               rel="noopener"
               class="group block"
               :title="issue.title"
+              @click="openIssue($event, issue)"
             >
               <div class="relative aspect-[3/4] overflow-hidden rounded-sm bg-black">
                 <img
@@ -63,6 +88,31 @@
       </section>
     </section>
 
+    <!-- Up from the foot of the screen, over everything including the app's own
+         bar: reading a magazine is the whole screen's job, and the bar above it
+         would only offer somewhere else to be. Its own header carries what is
+         being read and the way out. -->
+    <USlideover
+      v-model:open="reading"
+      side="bottom"
+      :title="opened?.title ?? ''"
+      :ui="{
+        content: 'h-dvh max-h-dvh',
+        // No padding at any width. p-0 on its own loses to the sm: variant the
+        // slideover sets, which is how a phone came out right and a tablet did
+        // not.
+        body: 'overflow-y-auto p-0 sm:p-0',
+        // The title bar as short as it can be and still hold a title: it is
+        // sixty-four pixels by default, and every one of them is a strip of the
+        // scan somebody is trying to read.
+        header: 'min-h-0 p-2 sm:px-3',
+        close: 'top-2 end-2',
+      }"
+    >
+      <template #body>
+        <RetroReader v-if="opened" :key="opened.path" :path="opened.path" />
+      </template>
+    </USlideover>
   </article>
 </template>
 
@@ -74,6 +124,47 @@
 // opened only when somebody asks for it, from a route that serves ranges so a
 // reader can jump about in it without fetching the whole thing.
 const { shelf: load } = useRetro()
+
+type Reader = 'app' | 'system'
+
+const readers: { value: Reader, label: string, hint: string }[] = [
+  { value: 'app', label: 'In der App', hint: 'Die Ausgabe öffnet sich über der Seite und lässt sich wieder schließen' },
+  { value: 'system', label: 'Im Betrachter', hint: 'Die Ausgabe wird an den Browser übergeben und öffnet sich in einem eigenen Fenster' },
+]
+
+// Kept across visits, so a comparison survives walking off to look at something
+// else and coming back.
+const reader = useState<Reader>('retro-reader', () => 'app')
+
+const { openOutside } = useStandalone()
+
+const opened = ref<Issue | undefined>()
+const reading = ref(false)
+
+/**
+ * Open an issue with whichever reader is chosen.
+ *
+ * The app's own is the sheet, and taking the click is what stops the browser
+ * from navigating away underneath it.
+ *
+ * The system reader is the browser's, but it still must not be given this
+ * window: installed, there is no address bar, no back button and no pull to
+ * reload, so a scan opened in place is the last thing the app ever shows. It
+ * gets a window of its own instead, which leaves this one standing behind it.
+ * In an ordinary tab the link is left alone — there the browser's own chrome is
+ * the way back. See useStandalone.
+ */
+function openIssue(event: MouseEvent, issue: Issue) {
+  if (reader.value === 'app') {
+    event.preventDefault()
+    opened.value = issue
+    reading.value = true
+
+    return
+  }
+
+  openOutside(event, issue.href)
+}
 
 const { data: shelf, pending, error } = await useAsyncData('retro-shelf', load)
 
