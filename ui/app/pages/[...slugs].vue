@@ -45,6 +45,7 @@ const componentmap: Record<string, object | string> = {
   Film: resolveComponent('PageFilm'),
   Ausstellung: resolveComponent('PageExhibition'),
   Person: resolveComponent('PagePerson'),
+  Work: resolveComponent('PageWork'),
   Default: resolveComponent('PageExhibition'),
 }
 

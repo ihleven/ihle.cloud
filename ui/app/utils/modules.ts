@@ -55,6 +55,13 @@ export const appModules: Module[] = [
   { id: 'geheimtipp', label: 'Geheimtipp', at: '/geheimtipp', tile: { label: 'Geheimtipp', class: 'bg-sky-400/80' } },
   { id: 'search', label: 'Search', at: '/search', icon: 'i-feather-search' },
   { id: 'admin', label: 'Konten', at: '/admin', icon: 'i-lucide-shield' },
+
+  // The art archive. No icon and no tile on purpose: this entry exists so the
+  // route guard knows /werke belongs to somebody — without it the page was
+  // reachable by any account, since the guard only gates prefixes named here.
+  // Being absent from the navigation and the front page is then what keeps it
+  // unadvertised while the archive is still being built out.
+  { id: 'art', label: 'Kunst', at: '/werke' },
 ]
 
 /**

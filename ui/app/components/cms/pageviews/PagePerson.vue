@@ -32,5 +32,5 @@ const props = defineProps<{
   entry: PersonEntry
 }>()
 
-const markdown = computed(() => props.entry?.content?.markdown ? props.entry.content.markdown : '')
+const markdown = computed(() => props.entry?.content?.body ?? '')
 </script>

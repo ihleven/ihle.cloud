@@ -56,6 +56,10 @@ func (d *Work) Clone() interface{} {
 func (d *Work) AugmentSearchDoc(sd *search.Document, l search.Level) (interface{}, error) {
 
 	doc := workIndexDoc{Document: *sd}
+	// The archive's own status, DEL included. A deleted work is still a work
+	// that existed, so it stays findable rather than being dropped from the
+	// index: searching for it is the point of keeping it.
+	doc.Artwork.Status = d.Status
 	doc.Artwork.Year = d.Year
 	doc.Artwork.Form = d.Form
 	doc.Artwork.Genre = d.Genre
@@ -71,6 +75,7 @@ func (d *Work) AugmentSearchDoc(sd *search.Document, l search.Level) (interface{
 type workIndexDoc struct {
 	search.Document
 	Artwork struct {
+		Status  string `json:"status"` // as the old database had it: "", "DEL", …
 		Year    int    `json:"year"`
 		Form    string `json:"form"`     // gattung | drawing, painting, sculpture -> art form
 		Genre   string `json:"genre"`    // in der bildenden Kunst ein thematisch-inhaltliches Gebiet, wie Historie, Landschaft, Porträt oder Stillleben
@@ -83,26 +88,26 @@ type workIndexDoc struct {
 	} `json:"artwork"`
 }
 
-func (d *workIndexDoc) BleveType() string {
-	return "Work"
-}
-func (d Work) BleveMapping() *mapping.DocumentMapping {
+// AdaptMapping declares how the artwork fields AugmentSearchDoc emits are
+// indexed. Registered with search.RegisterMappingAdapter, which is the only
+// mechanism the CMS still has: it builds one shared document mapping for every
+// entry and hands it to each adapter in turn, so an adapter adds its own
+// sub-document and leaves the rest alone.
+//
+// What is declared here is exactly what workIndexDoc carries and no more. The
+// mapping this replaced also declared name, id, title, area, remark, commentary,
+// phase and teile, none of which AugmentSearchDoc has ever filled in — they
+// indexed nothing. Commentary in particular must stay out: the field it comes
+// from is marked as not for the public.
+func AdaptMapping(entrymap *mapping.DocumentMapping) {
 
-	text := bleve.NewTextFieldMapping()
-	text.Analyzer = de.AnalyzerName
 	keyword := bleve.NewKeywordFieldMapping()
 	integer := bleve.NewNumericFieldMapping()
 
-	mapping := search.CreateEntryDocMapping()
-	// mapping := bleve.NewDocumentMapping()
-	mapping.Dynamic = false
-
 	artwork := bleve.NewDocumentMapping()
 	artwork.Dynamic = false
-	artwork.AddFieldMappingsAt("name", text)
-	artwork.AddFieldMappingsAt("id", keyword)
+
 	artwork.AddFieldMappingsAt("status", keyword)
-	artwork.AddFieldMappingsAt("title", text)
 	artwork.AddFieldMappingsAt("year", integer)
 	artwork.AddFieldMappingsAt("form", keyword)
 	artwork.AddFieldMappingsAt("genre", keyword)
@@ -112,15 +117,8 @@ func (d Work) BleveMapping() *mapping.DocumentMapping {
 	artwork.AddFieldMappingsAt("height", integer)
 	artwork.AddFieldMappingsAt("width", integer)
 	artwork.AddFieldMappingsAt("depth", integer)
-	artwork.AddFieldMappingsAt("area", integer)
-	artwork.AddFieldMappingsAt("remark", text)
-	artwork.AddFieldMappingsAt("commentary", text)
-	artwork.AddFieldMappingsAt("phase", keyword)
-	artwork.AddFieldMappingsAt("teile", integer)
 
-	mapping.AddSubDocumentMapping("artwork", artwork)
-
-	return mapping
+	entrymap.AddSubDocumentMapping("artwork", artwork)
 }
 
 type Ausstellung struct { // Exhibition
@@ -144,19 +142,21 @@ func (d *Ausstellung) Clone() interface{} {
 	return &wa
 }
 
-func (d Ausstellung) BleveType() string {
-	return "exhibition"
-}
-
 func (d *Ausstellung) AugmentSearchDoc(doc *search.Document, lev search.Level) (interface{}, error) {
 	return struct {
 		search.Document
-		// BleveType   string `json:"type"`
 		Ausstellung `json:"exhibition"`
 	}{Document: *doc, Ausstellung: *d}, nil
 }
 
-func (d Ausstellung) BleveMapping() *mapping.DocumentMapping {
+// AdaptMappingAusstellung declares how an exhibition is indexed. The whole
+// struct goes under `exhibition`, which is what AugmentSearchDoc embeds.
+//
+// Two declarations are corrected rather than carried over: kommentar and fotos
+// were declared numeric, though one is a string and the other a list of them,
+// so neither was ever searchable; and the mapping named "title" where the field
+// is spelled "titel", so the exhibition's own title indexed nothing.
+func AdaptMappingAusstellung(entrymap *mapping.DocumentMapping) {
 
 	text := bleve.NewTextFieldMapping()
 	text.Analyzer = de.AnalyzerName
@@ -164,27 +164,21 @@ func (d Ausstellung) BleveMapping() *mapping.DocumentMapping {
 	integer := bleve.NewNumericFieldMapping()
 	datetime := bleve.NewDateTimeFieldMapping()
 
-	emapping := search.CreateEntryDocMapping()
-	emapping.Dynamic = false
+	exhibition := bleve.NewDocumentMapping()
+	exhibition.Dynamic = false
 
-	mapping := bleve.NewDocumentMapping()
-	mapping.Dynamic = false
+	exhibition.AddFieldMappingsAt("id", integer)
+	exhibition.AddFieldMappingsAt("code", keyword)
+	exhibition.AddFieldMappingsAt("ort", keyword)
+	exhibition.AddFieldMappingsAt("jahr", integer)
+	exhibition.AddFieldMappingsAt("venue", text)
+	exhibition.AddFieldMappingsAt("titel", text)
+	exhibition.AddFieldMappingsAt("untertitel", text)
+	exhibition.AddFieldMappingsAt("typ", keyword)
+	exhibition.AddFieldMappingsAt("von", datetime)
+	exhibition.AddFieldMappingsAt("bis", datetime)
+	exhibition.AddFieldMappingsAt("kommentar", text)
+	exhibition.AddFieldMappingsAt("fotos", keyword)
 
-	// mapping.AddFieldMappingsAt("name", textFieldMapping)
-	// mapping.AddFieldMappingsAt("id", keywordFieldMapping)
-	mapping.AddFieldMappingsAt("code", keyword)
-	mapping.AddFieldMappingsAt("ort", keyword)
-	mapping.AddFieldMappingsAt("jahr", integer)
-	mapping.AddFieldMappingsAt("venue", text)
-	mapping.AddFieldMappingsAt("title", text)
-	mapping.AddFieldMappingsAt("untertitel", keyword)
-	mapping.AddFieldMappingsAt("typ", keyword)
-	mapping.AddFieldMappingsAt("von", datetime)
-	mapping.AddFieldMappingsAt("bis", datetime)
-	mapping.AddFieldMappingsAt("kommentar", integer)
-	mapping.AddFieldMappingsAt("fotos", integer)
-
-	emapping.AddSubDocumentMapping("exhibition", mapping)
-
-	return emapping
+	entrymap.AddSubDocumentMapping("exhibition", exhibition)
 }

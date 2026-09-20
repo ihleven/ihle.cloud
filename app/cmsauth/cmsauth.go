@@ -31,6 +31,7 @@ func init() {
 	modules.Define("familie", "Stammbaum und Personen.")
 	modules.Define("kalender", "Der Kalender.")
 	modules.Define("search", "Die Suche.")
+	modules.Define("art", "Das Kunstarchiv.")
 }
 
 // Hidrive gates browsing the family's storage.

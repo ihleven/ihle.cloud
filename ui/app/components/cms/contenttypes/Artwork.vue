@@ -27,7 +27,7 @@
       :ui="{ content: 'max-w-3xl', body: 'sm:p-0' }"
     >
       <template #content>
-        <Person
+        <Artwork
           :entry="entry"
           @update:entry="emit('update:entry', $event)"
         />
@@ -101,10 +101,10 @@
         class="col-span-4"
       >
         <USelect
-          :model-value="entry.content.gattung"
+          :model-value="entry.content.form"
           :items="[{ M: 'Malerei' }, { Z: 'Zeichnung' }, { P: 'Plastik' }]"
           class="w-full"
-          @update:model-value="update('content.gattung', $event)"
+          @update:model-value="update('content.form', $event)"
         />
       </UFormField>
 
@@ -192,9 +192,9 @@
       >
         <UTextarea
           placeholder="Anmerkungen"
-          :model-value="entry.content.remarks"
+          :model-value="entry.content.remark"
           class="w-full"
-          @update:model-value="update('content.remarks', $event)"
+          @update:model-value="update('content.remark', $event)"
         />
       </UFormField>
 
@@ -204,9 +204,9 @@
       >
         <UTextarea
           placeholder="Kommentar"
-          :model-value="entry.content.comments"
+          :model-value="entry.content.commentary"
           class="w-full"
-          @update:model-value="update('content.comments', $event)"
+          @update:model-value="update('content.commentary', $event)"
         />
       </UFormField>
     </div>

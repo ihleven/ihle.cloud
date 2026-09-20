@@ -116,7 +116,7 @@
     <TipTap
 
       ref="tiptap"
-      v-model="entry.content.markdown"
+      v-model="entry.content.body"
       bubble-menu="link,B,I,S,U,H,C,sub,sup"
       floating-menu="h2,h3,h4,ul,ol"
       class="prose prose-sm max-w-none p-4 font-inter"

@@ -79,3 +79,30 @@ describe('splitForBar', () => {
     expect(rest).toHaveLength(0)
   })
 })
+
+// The art archive is registered for one reason only: so the route guard knows
+// /werke belongs to somebody. Before it was listed here the page was reachable
+// by any signed-in account, because the guard gates only the prefixes this
+// registry names. Keeping it out of the navigation and the front page is what
+// leaves it unadvertised — and an icon or a tile added later would undo that
+// silently, which is what these assertions are for.
+describe('the art archive', () => {
+  it('claims /werke, so the guard covers it', () => {
+    expect(moduleAt('/werke')?.id).toBe('art')
+    expect(moduleAt('/werke/etwas')?.id).toBe('art')
+  })
+
+  it('is offered nowhere', () => {
+    expect(navModules().map(m => m.id)).not.toContain('art')
+    expect(tileModules().map(m => m.id)).not.toContain('art')
+  })
+})
+
+// The journeys were put under the familie area rather than given a route of
+// their own, so that they are covered by the familie entitlement instead of
+// needing one of their own. That only holds while the path stays beneath it.
+describe('the journeys', () => {
+  it('are guarded as part of familie', () => {
+    expect(moduleAt('/famihlie/reisen/2025-bretagne')?.id).toBe('familie')
+  })
+})

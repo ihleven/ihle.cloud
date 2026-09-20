@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   //
   // The geheimtipp pool, which is a separate site with its own backend and its
   // own sign-in rather than an area of this app — see ui/layers/geheimtipp.
-  extends: ['../../cms/ui/layers/entry', '../../cms/ui/layers/godoc', './layers/geheimtipp'],
+  extends: ['../../cms/ui/layers/entry', '../../cms/ui/layers/godoc', './layers/geheimtipp', './layers/art'],
 
   modules: [
     '@nuxt/eslint',
@@ -33,6 +33,9 @@ export default defineNuxtConfig({
     // they have to be global — a lazily-loaded component would not be found.
     { path: '~/components/cms/contenttypes', pathPrefix: false, global: true },
     { path: '~/components/cms/panels', pathPrefix: false, global: true },
+    // Components a markdown body may use — MDC resolves them by name while
+    // rendering, so the same rule applies: they have to be global.
+    { path: '~/components/content', pathPrefix: false, global: true },
     { path: '~/components', pathPrefix: false },
   ],
 

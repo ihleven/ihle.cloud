@@ -137,6 +137,8 @@ func main() {
 	search.RegisterMappingAdapter(familie.AdaptMappingReise)
 	content.Register(art.Ausstellung{})
 	content.Register(art.Work{})
+	search.RegisterMappingAdapter(art.AdaptMapping)
+	search.RegisterMappingAdapter(art.AdaptMappingAusstellung)
 	// content.Register(ctype.Page{})
 
 	var err error
@@ -147,7 +149,27 @@ func main() {
 
 	switch subcmd := p.Subcommand().(type) {
 	case *importart.ImportCmd:
-		err = subcmd.Run()
+		// Only a writing import needs the content manager, and only then is a
+		// configured repository worth insisting on: a dry run reads the old
+		// database and prints, which nothing about the archive can affect.
+		// Built here rather than in the command because that is where the flags
+		// are.
+		var cms *mgmt.Mngr
+		if subcmd.Write {
+			// Refused rather than left to the manager. An empty repository
+			// still yields a usable Mngr, so the import runs to completion and
+			// reports the entries written — into a repository that is nowhere,
+			// with the push failing separately as a warning. Succeeding at
+			// nothing is the worst of the three outcomes.
+			if flags.RepoContent == "" {
+				err = fmt.Errorf("--write needs a content repository: set REPO_CONTENT")
+				break
+			}
+			cms, err = mgmt.NewContentManager(flags.RepoContent, withMngrOptions(flags))
+		}
+		if err == nil {
+			err = subcmd.Run(cms)
+		}
 	case *mail.MailCmd:
 		err = subcmd.Run()
 	case *AccountCmd:
@@ -276,6 +298,11 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	}
 
 	fapi := familie.NewApi(cms.Repo, cms.Engine)
+
+	// The art archive's own API. Its search is faceted over the artwork fields
+	// (Gattung, Technik, Träger) in a way the generic entry search is not, which
+	// is the whole reason it exists — see /werke.
+	aapi := art.NewApi(cms.Repo, cms.Engine)
 
 	// Whoever is signed in here is who the pool is told about. The token is
 	// minted per forwarded request and never given to the browser, so there is
@@ -427,6 +454,12 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/djvet/stream/{path...} ", requireDjvet(authsvc, djvet.Stream)),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
+
+		// Ungated, as the familie routes above are. The archive is readable and
+		// the UI gates the page, not the data.
+		route("  GET  /api/v1/artworks/{id}", aapi.ArtworkHandler),
+		route("  GET  /api/v1/art/search", aapi.Search),
+		route("  GET  /api/v1/art/search/mapping", aapi.MappingHandler),
 		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
 
 		// The geheimtipp pool's own backend, under this origin so a browser may

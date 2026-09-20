@@ -86,3 +86,86 @@ Verwalten
 Verwalten
 # wolfgang-ihle.de	17.02.2026	Externe Nameserver »	
 Verwalten
+
+# Github-Projekte
+
+### ihle.cloud 
+-> dieses Projekt
+- sollte umbenannt werden
+
+### drive Private
+ganz alt, integrieren in ihlvn, dann löschen
+war wohl erste version
+alte arbeit funktionalität war hier, 2021 -> ihle-cloud
+
+### ihle-cloud 
+arbeit aus drive im November 2021 übernommen
+
+### art 
+3 commits 2024 + 2025
+war ein Versuch das Kunstarchiv neu aufzusetzen
+
+
+
+
+### geheimtipp
+Geheimtipp nuxt3 frontend
+### goheimtipp 
+Private Geheimtipp cli
+### wolfgang-ihle Private
+wahrscheinlich das was auf tschabrun.eu installiert ist
+ 
+ ### Webseiten
+- wolfgangihle: www.wolfgang-ihle.de
+- tierklinik-nuxt: tierklinik-tschabrun.com
+- equiluz: equiluz.at
+
+### cms content  
+- cms-content Private
+- cms-content-test Private
+
+### mirrors
+- cms Privat
+- webcc-tool-api Private
+- webcc-elastic Private
+- webcc-api Private
+- webcc-conf Private
+- hhd-web Private ColdFusion Updated on Mar 6, 2020
+
+### Latex
+- memoiren Private TeX 
+- monochrome-malerei PrivateRich Text Format Updated on Nov 6, 2025
+
+
+
+
+
+
+
+### pkg 
+pkg's for gophers
+-> löschen
+### errors Public
+-> löschen
+
+
+### cloud11-webapp 
+Private
+-> dekomissioniert
+
+### cloud11-api 
+Private
+-> dekomissioniert
+
+### wi Private
+???
+
+
+
+
+
+
+- presentations Private
+
+- impress.js Public
+

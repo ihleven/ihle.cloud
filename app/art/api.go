@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/interhome-group/cms/mgmt/search"
 	"github.com/interhome-group/cms/pkg/errs"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/gorilla/schema"
 	"github.com/interhome-group/cms/mgmt/gitrepo"
 )
@@ -26,144 +24,63 @@ type api struct {
 	engine *search.Engine
 }
 
-func (a *api) Handler(origins ...string) http.Handler {
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /art-api/hello/{id}", a.HelloHandler)
-	mux.HandleFunc("GET /art-api/artworks/{id}", a.ArtworkHandler)
-	mux.HandleFunc("GET /art-api/search", a.Search)
-	mux.HandleFunc("GET /art-api/search/mapping", a.MappingHandler)
-
-	// corsoptions := &cors.Options{
-	// 	AllowedOrigins:   origins,
-	// 	AllowCredentials: true,
-	// 	AllowedHeaders:   []string{"JWT", "authorization", "cmsauth", "Cookie"},
-	// 	AllowedMethods:   []string{"PUT", "POST", "GET", "DELETE"},
-	// 	// Enable Debugging for testing, consider disabling in production
-	// 	Debug: false,
-	// }
-
-	// return cors.New(corsoptions).Handler(a)
-
-	// if corsoptions != nil {
-	return mux //cors.New(*corsoptions).Handler(mux)
-	// }
-	// return http.Handler(a.mux)
-}
-
-func (a *api) HelloHandler(w http.ResponseWriter, r *http.Request) {
-	what := r.PathValue("id")
-	if what == "" {
-		what = "World"
-	}
-
-	respond(w, r, 200, fmt.Sprintf("Hello %s!", what))
-}
-
-func (a *api) ArtworkHandler(w http.ResponseWriter, r *http.Request) {
+func (a *api) ArtworkHandler(w http.ResponseWriter, r *http.Request) error {
 
 	entry, err := a.repo.GetEntry(fmt.Sprintf("artworks/%s.json", r.PathValue("id")))
 	if err != nil {
-		respond(w, r, errs.StatusOf(err), err)
-		return
+		return respond(w, r, errs.StatusOf(err), err)
 	}
 
-	respond(w, r, 200, entry)
+	return respond(w, r, 200, entry)
 }
 
-func (a *api) Search(w http.ResponseWriter, r *http.Request) {
+func (a *api) Search(w http.ResponseWriter, r *http.Request) error {
 
 	params := ExtParams{Params: search.Params{PageSize: 20, Fields: "*"}}
 	enc := schema.NewDecoder()
+	// Unknown query keys are the client's business, not an error: the page
+	// sends every filter it has and leaves the empty ones out.
+	enc.IgnoreUnknownKeys(true)
 	enc.Decode(&params, r.URL.Query())
 
+	// Refused rather than answered emptily. Everything this searches on — the
+	// artwork sub-document and its facets — is written by AugmentSearchDoc,
+	// which the indexer calls only at fulltext and above; at basic it returns
+	// the plain entry document first. So below fulltext every filter matches
+	// nothing and every facet comes back with no terms, and /werke renders a
+	// working page with no content and no reason given.
+	//
+	// 501 because it is the deployment that cannot answer, not the request that
+	// was wrong — the same answer the CMS gives for reads that need an index it
+	// was not started with.
+	if a.engine.Level < search.Fulltext {
+		return respond(w, r, http.StatusNotImplemented, errs.New(
+			"art search needs SEARCH_LEVEL fulltext or extended, this one runs at %s",
+			a.engine.Level, errs.HTTPStatus(501)))
+	}
+
+	// Facet names are the page's, not the field's: /werke reads them back by
+	// name to put a count beside each filter.
 	searchResult, err := a.engine.Search(params.Params,
-		search.Facet("form", "artwork.form", 10),
+		search.Facet("forms", "artwork.form", 10),
+		search.Facet("media", "artwork.medium", 20),
+		search.Facet("support", "artwork.support", 20),
+		search.Facet("status", "artwork.status", 10),
 		search.Facet("ort", "exhibition.ort", 100),
-		// search.Facet("filter", "filter", 100),
 		search.Facet("type", "type", 100),
 
 		parseext(params),
 	)
 	if err != nil {
-		respond(w, r, 500, err)
-		return
+		return respond(w, r, 500, err)
 	}
 
-	respond(w, r, 200, searchResult)
+	return respond(w, r, 200, searchResult)
 }
 
-func (a *api) MappingHandler(w http.ResponseWriter, r *http.Request) {
+func (a *api) MappingHandler(w http.ResponseWriter, r *http.Request) error {
 
-	respond(w, r, 200, a.engine.Mapping())
-}
-
-func (a *api) SearchHandler(w http.ResponseWriter, r *http.Request) {
-
-	highlight := r.URL.Query().Has("highlight")
-
-	query := bleve.NewConjunctionQuery()
-
-	for _, param := range []string{"id", "medium", "support", "title", "form", "phase"} {
-		if p := r.URL.Query().Get(param); p != "" {
-			termquery := bleve.NewTermQuery(p)
-			termquery.SetField(param)
-			query.AddQuery(termquery)
-		}
-	}
-
-	if year, err := strconv.Atoi(r.URL.Query().Get("year")); err == nil {
-		min, max := float64(year), float64(year+1)
-		numrangequery := bleve.NewNumericRangeQuery(&min, &max)
-		numrangequery.SetField("year")
-		query.AddQuery(numrangequery)
-	}
-
-	if q := r.URL.Query().Get("q"); q != "" {
-
-		mq := bleve.NewMatchQuery(q)
-		query.AddQuery(mq)
-	}
-
-	if len(r.URL.Query()) == 0 {
-		query.AddQuery(bleve.NewMatchAllQuery())
-	}
-	for _, c := range query.Conjuncts {
-
-		fmt.Printf("query: %#v\n", c)
-	}
-
-	searchRequest := bleve.NewSearchRequestOptions(query, 1000, 0, false)
-	if highlight {
-		searchRequest.Highlight = bleve.NewHighlight()
-	}
-
-	searchRequest.Fields = []string{"*"}
-
-	f := bleve.NewFacetRequest("year", 50)
-	for i := range 50 {
-		min := float64(1980 + i)
-		max := float64(1980 + i + 1)
-		// fmt.Println(min, max)
-		f.AddNumericRange(strconv.Itoa(1980+i), &min, &max)
-	}
-	searchRequest.AddFacet("years", f)
-	searchRequest.AddFacet("media", bleve.NewFacetRequest("medium", 20))
-	searchRequest.AddFacet("support", bleve.NewFacetRequest("support", 20))
-	searchRequest.AddFacet("forms", bleve.NewFacetRequest("form", 20))
-	searchRequest.AddFacet("status", bleve.NewFacetRequest("status", 20))
-
-	// res, err := a.index.Search(searchRequest)
-	// if err != nil {
-	// 	respond(w, r, 500, err)
-	// 	return
-	// }
-	// respond(w, r, 200, res)
-	return //bunrouter.JSON(rw, searchResult)
-	// for _, hit := range searchResult.Hits {
-	// 	fmt.Fprintf(w, "ID: %s, Score: %f\n", hit.ID, hit.Score)
-	// }
+	return respond(w, r, 200, a.engine.Mapping())
 }
 
 func respond(w http.ResponseWriter, r *http.Request, status int, data interface{}) error {

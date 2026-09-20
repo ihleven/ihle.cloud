@@ -1,12 +1,10 @@
 package familie
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/goccy/go-yaml"
 	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/mgmt/search"
 )
@@ -19,44 +17,9 @@ type Reise struct {
 	Von  string    `json:"von"`
 	Bis  time.Time `json:"bis"`
 
-	Content string `json:"markdown" yaml:"-"`
-}
-
-func (p *Reise) MarshalMarkdown(meta content.Meta) ([]byte, error) {
-
-	type matter struct {
-		Meta    content.Meta `yaml:",inline"`
-		Content *Reise       `yaml:"content"`
-	}
-
-	matterbytes, err := yaml.Marshal(matter{Meta: meta, Content: p})
-	if err != nil {
-		return nil, err
-	}
-
-	return []byte(fmt.Sprintf("---\n%s---\n%s\n", matterbytes, p.Content)), nil
-}
-
-func (p *Reise) UnmarshalMarkdown(data []byte, matter *Frontmatter) error {
-
-	if t, ok := matter.Content["von"].(string); ok {
-		// p.Geburtstag, _ = time.Parse(time.RFC3339, t)
-		p.Von = t
-	}
-	if t, ok := matter.Content["bis"].(string); ok {
-
-		p.Bis, _ = time.Parse("2006-01-02", t)
-	}
-	if vater, ok := matter.Content["ziel"].(string); ok {
-		p.Ziel = vater
-	}
-	if mutter, ok := matter.Content["jahr"].(int); ok {
-
-		p.Jahr = mutter
-	}
-	p.Content = string(data)
-	// fmt.Printf("unmarschal Person: %+v\n", p)
-	return nil
+	// See Person.Body: declaring it is what makes the generic markdown codec
+	// fill it.
+	Body content.Body `json:"body" yaml:"-"`
 }
 
 func (p *Reise) Clone() interface{} {
@@ -70,7 +33,7 @@ func (p *Reise) AugmentSearchDoc(doc *search.Document, level search.Level) (inte
 
 	d := struct {
 		search.Document
-		Reise *Reise `json:"person"`
+		Reise *Reise `json:"reise"`
 		// Geburtstag time.Time `json:"geburtstag"`
 		// Todestag   time.Time `json:"todestag"`
 		// Vater      string    `json:"vater"`
@@ -85,7 +48,7 @@ func (p *Reise) AugmentSearchDoc(doc *search.Document, level search.Level) (inte
 		// Mutter:     p.Mutter,
 		// Content:    p.Content,
 	}
-	d.Text = map[string]string{"de": p.Content}
+	d.Text = map[string]string{"de": p.Body.String()}
 	// fmt.Printf("AUGMENT: %+v\n", d)
 	return d, nil
 }
@@ -101,7 +64,7 @@ func AdaptMappingReise(entrymap *mapping.DocumentMapping) {
 	reise.Dynamic = false
 	reise.AddFieldMappingsAt("name", text)
 
-	reise.AddFieldMappingsAt("content", text)
+	reise.AddFieldMappingsAt("body", text)
 	reise.AddFieldMappingsAt("von", date)
 	reise.AddFieldMappingsAt("bis", date)
 	reise.AddFieldMappingsAt("ziel", keyword)

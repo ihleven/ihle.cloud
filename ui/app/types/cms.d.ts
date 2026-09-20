@@ -2,3 +2,4 @@
 // editing shell; these name the content shapes this app stores in it.
 type PersonEntry = Entry & { content: Person }
 type ArtworkEntry = Entry & { content: Artwork }
+type ReiseEntry = Entry & { content: Reise }
