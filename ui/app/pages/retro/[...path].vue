@@ -3,7 +3,7 @@
     <!-- The way back, kept on screen. Installed, this is the only one there
          is: no address bar, no back button, no pull to reload. -->
     <header
-      class="sticky top-0 z-10 flex items-center gap-2 border-b border-accented bg-default px-2 py-1 text-highlighted"
+      class="sticky top-0 flex items-center gap-2 border-b border-accented bg-default px-2 py-1 text-highlighted"
     >
       <UButton
         to="/retro"
@@ -30,6 +30,10 @@
 // The shelf opens one over itself rather than coming here, so this exists for
 // the links that are kept and shared — which is also why it is a page with the
 // app's chrome rather than the sheet the shelf slides up.
+// The reader has a header of its own, carrying the way back to the shelf, and
+// a magazine is better read without a second bar above it.
+definePageMeta({ shell: { bar: false, footer: false } })
+
 const route = useRoute()
 
 const path = computed(() => {

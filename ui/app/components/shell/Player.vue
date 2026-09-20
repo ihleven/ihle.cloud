@@ -1,5 +1,10 @@
 <template>
-  <!-- One element, two densities. The audio node is never wrapped in a branch
+  <!-- No z-index: the layout renders this after the page and before the area
+       bar, and that order is the stacking. It carried z-30, which put it over
+       the menu as well — open the menu while something was playing and the
+       player sat in front of it. See main.css.
+
+       One element, two densities. The audio node is never wrapped in a branch
        and never moved: re-creating it or reparenting it interrupts playback in
        several browsers, which is the whole thing this component exists to stop.
        Only the box around it and what sits beside it change with the route, and
@@ -7,7 +12,7 @@
        element against one of them. -->
   <div
     v-if="current"
-    class="fixed z-30 flex items-center gap-2 border-accented bg-default"
+    class="fixed flex items-center gap-2 border-accented bg-default"
     :class="detailed
       ? 'inset-x-0 bottom-0 border-t px-2 py-1'
       : 'right-3 bottom-3 max-w-[22rem] rounded-full border px-3 py-1 shadow-lg'"

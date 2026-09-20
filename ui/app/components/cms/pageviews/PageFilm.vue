@@ -1,6 +1,6 @@
 <template>
   <article class="w-full bg-elevated">
-    <section class="sticky top-0 z-10 w-full bg-black">
+    <section class="sticky top-0 w-full bg-black">
       <!-- The overlay is positioned against the frame, so the wrapper has to be
            exactly the size of the picture rather than of the player. -->
       <div class="relative mx-auto aspect-video max-w-3xl">

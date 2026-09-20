@@ -7,7 +7,7 @@
          to shrink, so on a phone the filter was the only thing that could — and
          it shrank to nothing, leaving a control that was present, focusable and
          invisible. A second line is the honest answer to not enough width. -->
-    <nav class="sticky top-0 z-10 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-accented bg-default px-2 py-1">
+    <nav class="sticky top-0 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-accented bg-default px-2 py-1">
       <NuxtLink to="/" class="flex shrink-0 items-center gap-0.5 text-sm text-muted hover:text-highlighted">
         <UIcon name="i-lucide-chevron-left" class="size-5" />
         <span class="hidden sm:inline">Zurück</span>

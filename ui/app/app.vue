@@ -4,6 +4,7 @@
     <NuxtLayout v-if="session || isPublic">
       <NuxtPage />
     </NuxtLayout>
+
     <div v-else class="absolute inset-0 bg-[url(/Summer-Leaves.jpg)]" />
 
     <!-- Outside the layout on purpose. There are several layouts and a layer

@@ -297,3 +297,16 @@
 /* .focus-inset-ring {
   @apply focus:outline-none focus:ring-4 focus:ring-sky-400 active:ring-3 active:ring-sky-300 ;
 } */
+
+/* This app sets no z-index. Stacking is document order.
+   CSS already gives the order wanted, for free: a positioned element paints
+   above unpositioned content, and among positioned elements the later one in
+   the document wins. The default layout arranges exactly that — the page, then
+   the player, then the area bar, then the menu, which Nuxt UI portals to the
+   end of the document and which is why its overlays ship with no z-index of
+   their own.
+   Introducing a number is what broke the bar twice: with one it covered its own
+   menu, without one the page covered it. Where something must sit above a
+   positioned sibling, give it a position too and put it later — as the pool
+   door in pages/index.vue does with its blurred backdrop. */
+

@@ -6,8 +6,12 @@
     v-if="confined"
     class="ght-door grid min-h-screen place-content-center overflow-hidden font-sans antialiased"
   >
-    <div class="spotlight fixed right-0 left-0 z-10" />
-    <div class="z-20 max-w-[520px] text-center">
+    <!-- The glow is fixed and so painted over unpositioned content whatever
+         the order; giving the content a position of its own puts the two on the
+         same footing, where document order decides and the later one wins. That
+         is why this needs no z-index — see main.css. -->
+    <div class="spotlight fixed right-0 left-0" />
+    <div class="relative max-w-[520px] text-center">
       <div class="flex w-full flex-col items-center justify-center">
         <NuxtLink
           to="/geheimtipp"
@@ -114,18 +118,12 @@ const confined = computed(() =>
 
 // Each tile names the area it belongs to; the entitlement decides whether it is
 // rendered at all.
-const tiles = computed(() => allowed([
-  { module: 'content', label: 'CMS', to: '/entries', class: 'bg-blue-500/80' },
-  { module: 'filme', label: 'Super 8', to: '/filme', class: 'bg-rose-500/80' },
-  { module: 'familie', label: 'Familie', to: '/famihlie', class: 'bg-violet-500/80' },
-  { module: 'hidrive', label: 'Dateien', to: '/hidrive', class: 'bg-amber-500/80' },
-  { module: 'kalender', label: 'Kalender', to: '/kalender', class: 'tile-kalender' },
-  { module: 'mediathek', label: 'Mediathek', to: '/mediathek', class: 'bg-sky-500/80' },
-  { module: 'retro', label: 'Zeitschriften', to: '/retro', class: 'bg-cyan-500/80' },
-  { module: 'musik', label: 'Musik', to: '/musik', class: 'bg-cyan-300/80' },
-  { module: 'djvet', label: 'DJ-Sets', to: '/djvet', class: 'tile-oscillate' },
-  { module: 'geheimtipp', label: 'Geheimtipp', to: '/geheimtipp', class: 'bg-sky-400/80' },
-]))
+// The tiles this account may see. Which modules have one, what each says and
+// how it looks is utils/modules — the same list the navigation and the route
+// guard read, so a new area appears in all three or in none.
+const tiles = computed(() => allowed(
+  tileModules().map(m => ({ module: m.id, label: m.tile!.label, to: m.at, class: m.tile!.class })),
+))
 </script>
 
 <!-- Carried over from ihleven.de's own front page so the door looks the way it

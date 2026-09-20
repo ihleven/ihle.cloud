@@ -1,6 +1,6 @@
 <template>
   <article class="min-h-full w-full bg-elevated">
-    <header class="sticky top-0 z-10 flex items-baseline gap-2 border-b border-accented bg-default px-3 py-2">
+    <header class="sticky top-0 flex items-baseline gap-2 border-b border-accented bg-default px-3 py-2">
       <NuxtLink to="/djvet" class="text-xs text-muted hover:text-primary">DJ-Sets</NuxtLink>
       <span class="text-xs text-dimmed">/</span>
       <NuxtLink :to="`/djvet/${series}`" class="text-xs text-muted hover:text-primary">

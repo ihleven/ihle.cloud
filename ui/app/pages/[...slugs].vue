@@ -3,13 +3,16 @@
     <component
       :is="component"
       v-model:entry="entry"
-      class="z-0 grow"
+      class="grow"
     />
   </article>
 </template>
 
 <script setup lang="ts">
 definePageMeta({
+  // A content entry is shown full-bleed and carries its own way around, so the
+  // round menu button would sit on top of it.
+  shell: { menu: false },
   middleware: [
     function () {
       // The audience a session was issued for. Only this app issues one, so a

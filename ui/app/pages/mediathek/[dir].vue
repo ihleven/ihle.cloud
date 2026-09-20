@@ -14,7 +14,7 @@
       <!-- The player and the bar that drives it travel together and stay at the
            top, so that reaching the fortieth episode of a series does not mean
            scrolling the thing you are watching off the screen. -->
-      <div class="sticky top-0 z-10">
+      <div class="sticky top-0">
         <section class="bg-black">
           <video
             v-if="current"

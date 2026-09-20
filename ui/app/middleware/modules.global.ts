@@ -5,24 +5,14 @@
 // bookmark lands somewhere that explains itself instead of on a page the person
 // was never meant to be offered.
 //
+// Which path belongs to which area is utils/modules, so a new area is guarded
+// by existing — the archive was reachable unguarded for months because this
+// file kept its own copy of the list and nobody added /retro to it.
+//
 // Runs after auth.global (alphabetical order), so the session is already loaded.
-const AREA_BY_PREFIX: Record<string, string> = {
-  '/filme': 'filme',
-  '/entries': 'content',
-  '/famihlie': 'familie',
-  '/hidrive': 'hidrive',
-  '/kalender': 'kalender',
-  '/mediathek': 'mediathek',
-  '/musik': 'musik',
-  '/djvet': 'djvet',
-  '/retro': 'retro',
-  '/search': 'search',
-  '/admin': 'admin',
-}
-
 export default defineNuxtRouteMiddleware((to) => {
-  const prefix = Object.keys(AREA_BY_PREFIX).find(p => to.path === p || to.path.startsWith(p + '/'))
-  if (!prefix) return
+  const module = moduleAt(to.path)
+  if (!module) return
 
   const { session } = useAuth()
   const { may } = useModules()
@@ -32,13 +22,12 @@ export default defineNuxtRouteMiddleware((to) => {
   // route once the person signs in. There is nothing to redirect to.
   if (!session.value) return
 
-  const area = AREA_BY_PREFIX[prefix]!
-  if (!may(area)) {
+  if (!may(module.id)) {
     // The app's own error page, rather than a redirect to a made-up route: this
     // is a refusal, so it should read as one and carry the status.
     return abortNavigation(createError({
       statusCode: 403,
-      statusMessage: `Kein Zugriff auf «${area}».`,
+      statusMessage: `Kein Zugriff auf «${module.id}».`,
       fatal: true,
     }))
   }
