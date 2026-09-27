@@ -130,6 +130,11 @@
 // The episodes are read out of the folder's filenames rather than recorded
 // anywhere, with all the unevenness that implies — see useMediathek for what
 // each of those readings assumes and where it is already known to be wrong.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const route = useRoute()
 const dir = computed(() => String(route.params.dir ?? ''))
 

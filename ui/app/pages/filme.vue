@@ -1,7 +1,7 @@
 <template>
-  <article class="flex min-h-full w-full flex-col bg-elevated">
+  <article class="flex min-h-full w-full flex-col bg-white">
 
-    <header class="flex shrink-0 justify-end gap-2 p-2">
+    <header class="flex shrink-0 justify-start gap-2 p-2">
       <UButton
         size="xs" variant="ghost" color="neutral"
         :icon="wall === 'black' ? 'i-lucide-sun' : 'i-lucide-moon'"
@@ -42,7 +42,7 @@
          footer without becoming a band of its own. -->
     <div
       v-else-if="searchresult"
-      class="grid grow content-start grid-cols-3 gap-1 border-y border-black p-1 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10"
+      class="grid grow grid-cols-3 content-start gap-1 border-y border-black p-1 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10"
       :class="wall === 'black' ? 'bg-black' : 'bg-white'"
     >
       <NuxtLink
@@ -60,7 +60,7 @@
         >
         <!-- The title sits on the still. The gradient is there so a name over a
              bright frame stays readable without a panel covering the picture. -->
-        <div class="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent px-1.5 pb-1 pt-6">
+        <div class="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent px-1.5 pt-6 pb-1">
           <h2 class="truncate text-xs font-medium text-white drop-shadow">{{ hit.fields.name }}</h2>
         </div>
       </NuxtLink>
@@ -69,6 +69,10 @@
 </template>
 
 <script setup lang="ts">
+// The button scrolls away with the page here, so it is not sitting over the
+// stills as you come down the list.
+definePageMeta({ shell: { bar: 'fixed', menu: 'fixed', background: 'var(--color-white)' } })
+
 const { public: { api } } = useRuntimeConfig()
 
 // 4:3 matches the box the list previews use. The two square modes differ only in

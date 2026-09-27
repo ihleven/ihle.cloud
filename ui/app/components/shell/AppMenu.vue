@@ -140,15 +140,28 @@
   <!-- The ring is border-current, so it is the same colour as the bars inside
        it and stays that way: the button reads dark-on-white here and would
        invert with the surface, where a literal black would disappear. -->
-  <button
-    ref="button"
-    type="button"
-    class="fixed top-[calc(1rem+env(safe-area-inset-top))] right-4 flex size-14 cursor-pointer items-center justify-center rounded-full border-2 border-current bg-default text-highlighted shadow-xl transition-transform duration-300 ease-out motion-reduce:transition-none"
-    :aria-expanded="open"
-    :aria-label="open ? 'Menü schließen' : 'Menü öffnen'"
-    @click="open = !open"
+  <!-- A frame the width of the strip's own row, so the button sits at the end of
+       that row rather than in the corner of the window. Below --shell-width the
+       two are the same thing and this changes nothing; above it, the button
+       comes in with the wordmark instead of drifting a foot away from it.
+
+       It carries the positioning the button used to carry, because a fixed
+       button inside a static frame would ignore the frame entirely and go back
+       to the window. No height and no pointer events: it is a ruler, and
+       everything under it has to stay clickable. -->
+  <div
+    :class="pinned ? 'fixed' : 'absolute'"
+    class="pointer-events-none inset-x-0 top-[calc(1rem+env(safe-area-inset-top))] mx-auto max-w-(--shell-width)"
   >
-    <!-- Three bars rather than two icons swapped over: the middle one fades
+    <button
+      ref="button"
+      type="button"
+      class="pointer-events-auto absolute right-4 flex size-14 cursor-pointer items-center justify-center rounded-full border-2 border-current bg-default text-highlighted shadow-xl transition-transform duration-300 ease-out motion-reduce:transition-none"
+      :aria-expanded="open"
+      :aria-label="open ? 'Menü schließen' : 'Menü öffnen'"
+      @click="open = !open"
+    >
+      <!-- Three bars rather than two icons swapped over: the middle one fades
          away and the outer two meet in the middle and cross.
 
          Each turns about its own centre, not its end. Turning about an end is
@@ -161,21 +174,22 @@
          apart.
 
          aria-hidden: the button already says what it is and what it does. -->
-    <span class="relative block h-5 w-7" aria-hidden="true">
-      <span
-        class="absolute top-1/2 left-0 h-[3px] w-full rounded-full bg-current transition-transform duration-300 ease-out motion-reduce:transition-none"
-        :style="{ transform: open ? 'translateY(-50%) rotate(45deg)' : 'translateY(calc(-50% - 7px))' }"
-      />
-      <span
-        class="absolute top-1/2 left-0 h-[3px] w-full -translate-y-1/2 rounded-full bg-current transition-opacity duration-300 ease-out motion-reduce:transition-none"
-        :class="open ? 'opacity-0' : ''"
-      />
-      <span
-        class="absolute top-1/2 left-0 h-[3px] w-full rounded-full bg-current transition-transform duration-300 ease-out motion-reduce:transition-none"
-        :style="{ transform: open ? 'translateY(-50%) rotate(-45deg)' : 'translateY(calc(-50% + 7px))' }"
-      />
-    </span>
-  </button>
+      <span class="relative block h-5 w-7" aria-hidden="true">
+        <span
+          class="absolute top-1/2 left-0 h-[3px] w-full rounded-full bg-current transition-transform duration-300 ease-out motion-reduce:transition-none"
+          :style="{ transform: open ? 'translateY(-50%) rotate(45deg)' : 'translateY(calc(-50% - 7px))' }"
+        />
+        <span
+          class="absolute top-1/2 left-0 h-[3px] w-full -translate-y-1/2 rounded-full bg-current transition-opacity duration-300 ease-out motion-reduce:transition-none"
+          :class="open ? 'opacity-0' : ''"
+        />
+        <span
+          class="absolute top-1/2 left-0 h-[3px] w-full rounded-full bg-current transition-transform duration-300 ease-out motion-reduce:transition-none"
+          :style="{ transform: open ? 'translateY(-50%) rotate(-45deg)' : 'translateY(calc(-50% + 7px))' }"
+        />
+      </span>
+    </button>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -191,13 +205,23 @@ const { standalone } = useStandalone()
 
 const open = ref(false)
 
-// The middle of the button, which is where the circle grows from. Written from
-// the same numbers the button is positioned with, or the two would disagree.
-const size = '3.5rem'
-const inset = '1rem'
+withDefaults(defineProps<{
+  /**
+   * Whether the button stays put while the page scrolls.
+   *
+   * Off by default, so it leaves with the top strip: the two sit in the same
+   * band, and it is the band iOS hazes at the top of scrolling content. Only
+   * the button is affected — what it opens is fixed either way.
+   */
+  pinned?: boolean
+}>(), { pinned: false })
 
-const centreX = `calc(100% - ${inset} - ${size} / 2)`
-const centreY = `calc(env(safe-area-inset-top) + ${inset} + ${size} / 2)`
+// Where the circle grows from: the middle of the button, read off the button
+// itself rather than rebuilt from the lengths it is positioned with. Those two
+// used to be written out separately and had to agree; now there is one of them,
+// and it is right whether the button is pinned or scrolling with the page.
+const centreX = ref('0px')
+const centreY = ref('0px')
 
 const panel = useTemplateRef<HTMLElement>('panel')
 const button = useTemplateRef<HTMLElement>('button')
@@ -212,6 +236,11 @@ function measure() {
   const b = button.value?.getBoundingClientRect()
   if (!p || !b) return
 
+  // Viewport coordinates, because the circle is fixed even when the button is
+  // not — an unpinned button that has scrolled is somewhere else on screen than
+  // its position in the document says.
+  centreX.value = `${b.left + b.width / 2}px`
+  centreY.value = `${b.top + b.height / 2}px`
   radius.value = `${discRadius(p, b)}px`
 }
 
@@ -258,8 +287,18 @@ onBeforeUnmount(() => {
 })
 
 // The page behind must not scroll while the menu is over it.
+//
+// Measured again on the way open, because an unpinned button has moved with the
+// page since the last measurement and the circle has to grow from where it is
+// now. Cheap, and it happens while the circle is still nothing.
+//
+// After the lock, not before: taking the scrollbar away widens the viewport,
+// and the button is anchored to the right edge, so measuring first would put
+// the circle's origin a scrollbar's width left of where the button ends up.
+// Overlay scrollbars take no space and would hide this; classic ones do not.
 watch(open, (isOpen) => {
   document.body.style.overflow = isOpen ? 'hidden' : ''
+  if (isOpen) measure()
 })
 
 onBeforeUnmount(() => {

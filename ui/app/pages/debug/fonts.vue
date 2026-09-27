@@ -151,6 +151,11 @@
 
 // Past what the files carry at either end on purpose: a ladder is only honest
 // if it shows where it stops.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const weights = [100, 300, 400, 500, 600, 700, 900]
 
 const spacings = [0, 50, 100, 150]

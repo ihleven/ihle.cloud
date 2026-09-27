@@ -35,6 +35,20 @@ type Handler struct {
 	Log   *slog.Logger
 }
 
+// log is where this handler writes, with a fallback.
+//
+// Every use of the logger here is on a path that has already gone wrong — a
+// rejected key, a stream that died halfway — so a nil Log turned a bad request
+// into a panic, and only on the paths nobody exercises. A handler that logs
+// somewhere by default cannot do that.
+func (h *Handler) log() *slog.Logger {
+	if h.Log == nil {
+		return slog.Default()
+	}
+
+	return h.Log
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -63,7 +77,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, blob.ErrInvalidKey):
 		// The key came from content, so this is a data problem, not a client
 		// one: report 404 outward and make it visible in the log.
-		h.Log.Error("unsafe media key rejected", "id", id, "key", key)
+		h.log().Error("unsafe media key rejected", "id", id, "key", key)
 		http.NotFound(w, r)
 		return
 	case err != nil:
@@ -127,7 +141,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, err := io.Copy(w, body); err != nil {
 		// The client seeking or closing the tab aborts the copy; that is normal
 		// for media and not worth an error line.
-		h.Log.Debug("media copy ended early", "id", id, "key", key, "err", err)
+		h.log().Debug("media copy ended early", "id", id, "key", key, "err", err)
 	}
 }
 
@@ -145,11 +159,11 @@ const StatusClientClosedRequest = 499
 // ordinary seeking fills the log with alarms.
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, what, subject string, err error) {
 	if clientGone(r, err) {
-		h.Log.Debug("client went away", "op", what, "subject", subject)
+		h.log().Debug("client went away", "op", what, "subject", subject)
 		w.WriteHeader(StatusClientClosedRequest)
 		return
 	}
-	h.Log.Error("media stream failed", "op", what, "subject", subject, "err", err)
+	h.log().Error("media stream failed", "op", what, "subject", subject, "err", err)
 	http.Error(w, "internal error", http.StatusInternalServerError)
 }
 

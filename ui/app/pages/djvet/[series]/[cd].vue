@@ -98,6 +98,11 @@
 // The titles come from the files' own tags, with the filenames as the fallback,
 // because these were written with their titles in them and the filenames are
 // frequently a number and nothing else.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const route = useRoute()
 const series = computed(() => String(route.params.series ?? ''))
 const slug = computed(() => String(route.params.cd ?? ''))

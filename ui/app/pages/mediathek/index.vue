@@ -56,6 +56,11 @@
 // count as series, what to call them and how many episodes they hold are all
 // read out of the listing; see useMediathek for what each of those readings
 // assumes and where it is already known to be wrong.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const { shelf: load } = useMediathek()
 
 const { data: shelf, pending, error } = await useAsyncData('mediathek-shelf', load)

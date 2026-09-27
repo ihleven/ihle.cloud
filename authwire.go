@@ -123,17 +123,20 @@ func optionalAccount(svc authenticator, h func(http.ResponseWriter, *http.Reques
 	}
 }
 
-// requireModule refuses a request whose account is not entitled to an area, and
+// requirePermission refuses a request whose account does not hold a right, and
 // hands the account to the handler as requireAccount does.
 //
-// The entitlement is checked here rather than trusted from the client: the
-// navigation hides areas an account may not see, but that is presentation.
-// Composed from requireAccount so there is one place that decides what being
-// signed in means.
+// The right is checked here rather than trusted from the client: the navigation
+// hides what an account may not use, but that is presentation. Composed from
+// requireAccount so there is one place that decides what being signed in means,
+// and so the two refusals stay distinct — 401 for nobody, 403 for somebody
+// without the right.
 //
-// Most areas never reach this — they are offered in a menu and nothing more.
-// It is for the ones where the area is the access decision itself.
-func requireModule(svc authenticator, key content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+// It takes any right, because the check does not depend on which kind it is.
+// Which kind it is matters to a reader, which is what requireModule below is
+// for: the name at the call site says whether an area or a capability is being
+// demanded, and those are answers to different questions.
+func requirePermission(svc authenticator, key content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return requireAccount(svc, func(w http.ResponseWriter, r *http.Request) error {
 		account, ok := auth.FromContext(r.Context())
 		if !ok || !cmsauth.May(account, key) {
@@ -141,6 +144,17 @@ func requireModule(svc authenticator, key content.PermissionKey, refusal string,
 		}
 		return h(w, r)
 	})
+}
+
+// requireModule refuses a request whose account is not entitled to an area.
+//
+// The same check as requirePermission and a different statement: this one says
+// the thing being demanded is a *place in this app* that a visitor may or may
+// not be shown, rather than something they may or may not do. Most areas never
+// reach here — they are offered in a menu and nothing more — and this is for
+// the ones where being in the area is itself the access decision.
+func requireModule(svc authenticator, area content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return requirePermission(svc, area, refusal, h)
 }
 
 // requireAdmin gates account administration, which can rename an account, grant
@@ -154,28 +168,25 @@ func requireHidrive(svc authenticator, h func(http.ResponseWriter, *http.Request
 	return requireModule(svc, cmsauth.Hidrive, "browsing the files requires the hidrive entitlement", h)
 }
 
-// requireMediathek gates the shared video library. A separate entitlement from
-// hidrive on purpose: the library is one fixed shelf rather than an account's
-// own storage, so the two permissions are about different things and neither
-// implies the other.
-func requireMediathek(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requireModule(svc, cmsauth.Mediathek, "the mediathek requires the mediathek entitlement", h)
-}
-
-// requireMusik gates the music shelf, on its own entitlement for the reason
-// the mediathek has one.
-func requireMusik(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requireModule(svc, cmsauth.Musik, "the music shelf requires the musik entitlement", h)
-}
-
-// requireDjvet gates the DJ archive, on its own entitlement for the reason the
-// mediathek has one.
-func requireDjvet(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requireModule(svc, cmsauth.Djvet, "the DJ archive requires the djvet entitlement", h)
-}
-
-// requireRetro gates the magazine archive, on its own entitlement for the
-// reason the mediathek has one.
-func requireRetro(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requireModule(svc, cmsauth.Retro, "the archive requires the retro entitlement", h)
+// cmsIdentity hands the CMS's own controllers an identity they can read.
+//
+// They are transport-free and ask for the signed-in person through
+// content.RequireUser, which reads one key; this app's middleware writes its own
+// Account under another and converts at each call site. So the two have to be
+// joined somewhere, and this is the join: authenticate once, and say who it is
+// in both vocabularies.
+//
+// Optional rather than required, like optionalAccount: reading content is open
+// in this app — the public site is rendered from it — and every entry carries an
+// ACL that decides for itself. What needs an account refuses for itself too: the
+// controllers answer 401 when there is nobody to name.
+func cmsIdentity(svc authenticator, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if account, ok := svc.Authenticate(r); ok {
+			ctx := auth.WithAccount(r.Context(), account)
+			ctx = content.ContextWithUser(ctx, account)
+			r = r.WithContext(ctx)
+		}
+		next.ServeHTTP(w, r)
+	})
 }

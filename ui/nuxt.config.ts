@@ -70,17 +70,6 @@ export default defineNuxtConfig({
     },
   },
   // ssr: false,
-  // app: {
-  //   rootAttrs: { class: 'h-full' },
-  //   head: {
-  //     htmlAttrs: {
-  //       class: 'h-full',
-  //     },
-  //     bodyAttrs: {
-  //       class: 'h-full',
-  //     },
-  //   },
-  // },
   css: ['~/assets/css/main.css'],
   ui: {
     colorMode: false,

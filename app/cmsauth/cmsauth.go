@@ -1,8 +1,14 @@
-// Package cmsauth is what an account is allowed to see, in the CMS's terms.
+// Package cmsauth is what an account is allowed, in the CMS's terms.
 //
-// It holds the feature areas this app has and the rules for reading an account's
-// permissions as access to them. Authentication — who someone is and how they
-// proved it — is app/auth; this is the other question, asked afterwards.
+// Two kinds of answer live here and they are not the same question. An *area*
+// — module.<id> — is what a visitor may reach: the films, the mediathek, the
+// file browser. A *capability* is what somebody may do, of which this app has
+// one of its own, media.read, in media.go. Areas are about consuming what has
+// been published; capabilities are about the work of producing it, and the same
+// person may hold either without the other.
+//
+// Authentication — who someone is and how they proved it — is app/auth; this is
+// the other question, asked afterwards.
 //
 // Nothing here knows what an account is. Everything takes a
 // content.UserProvider, which is the CMS's own seam and which an account

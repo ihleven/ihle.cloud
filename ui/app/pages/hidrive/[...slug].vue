@@ -121,6 +121,10 @@
 </template>
 
 <script setup lang="ts">
+// The page paints its own bg-gray-50, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--color-gray-50)' } })
+
 const route = useRoute()
 const { meta: fetchMeta, media, thumb } = useDrive()
 

@@ -106,3 +106,18 @@ describe('the journeys', () => {
     expect(moduleAt('/famihlie/reisen/2025-bretagne')?.id).toBe('familie')
   })
 })
+
+// The CMS layer serves /content/drafts — an editor's saved-but-unpublished
+// work. It is registered under the same id as the editor itself, because the
+// right to see unpublished work is the right to edit; the registry allows that
+// because the uniqueness rule is about paths, not ids.
+describe('the drafts page', () => {
+  it('is guarded as part of the content editor', () => {
+    expect(moduleAt('/content/drafts')?.id).toBe('content')
+  })
+
+  it('is not offered anywhere, being reached from the count in the content bar', () => {
+    expect(navModules().some(m => m.at === '/content/drafts')).toBe(false)
+    expect(tileModules().some(m => m.at === '/content/drafts')).toBe(false)
+  })
+})

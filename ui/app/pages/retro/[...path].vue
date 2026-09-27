@@ -32,7 +32,10 @@
 // app's chrome rather than the sheet the shelf slides up.
 // The reader has a header of its own, carrying the way back to the shelf, and
 // a magazine is better read without a second bar above it.
-definePageMeta({ shell: { bar: false, footer: false } })
+// No bar, no footer, and a menu button that goes with the page rather than
+// riding over the magazine: this page is a reader, and everything it does not
+// need is chrome across somebody's reading.
+definePageMeta({ shell: { bar: false, footer: false, menu: 'static', background: 'var(--ui-bg-elevated)' } })
 
 const route = useRoute()
 

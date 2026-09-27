@@ -262,7 +262,33 @@ const onlyThisScene = ref(false)
 const toast = useToast()
 const { session } = useAuth()
 
-const src = computed(() => `${useRuntimeConfig().public.api.base}/api/v1/films/${encodeURIComponent(props.entry.id)}`)
+/**
+ * What the player plays: the file named in the Key field, not the entry.
+ *
+ * The delivery route addresses a film by its id and reads the key off the stored
+ * entry, which is right for the site and wrong here. A film being written has
+ * not been saved once — there is no entry to read anything off, and its id is
+ * in no index — so the preview would have nothing to play until after the first
+ * save. And once it is saved, addressing by id would keep playing the *stored*
+ * key while the field above says something else, so correcting a mistyped path
+ * would change nothing on screen.
+ *
+ * Reading the field means the picture answers to what is in front of you, which
+ * is the whole of what a preview is for.
+ *
+ * The media store is served like any other shelf — the mediathek, the music, the
+ * magazines — so the key is a path, addressed the way those are. Each segment is
+ * encoded on its own: these paths have spaces in them ("public/Super 8/…") but
+ * the slashes are structure and have to survive.
+ */
+const src = computed(() => {
+  const key = props.entry.content.key
+  if (!key) return undefined
+
+  const path = key.split('/').map(encodeURIComponent).join('/')
+
+  return `${useRuntimeConfig().public.api.base}/api/v1/media/stream/${path}`
+})
 
 const scenes = computed<Scene[]>(() => props.entry.content.scenes ?? [])
 const annotations = computed<Annotation[]>(() => props.entry.content.annotations ?? [])

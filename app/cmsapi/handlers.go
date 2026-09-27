@@ -170,7 +170,7 @@ func EntryUpdate(mngr *mgmt.Mngr) func(http.ResponseWriter, *http.Request) error
 			return err
 		}
 
-		draft, err := mngr.StageAtHead(changeset, usr, r.URL.Query().Get("msg"), now)
+		draft, err := mngr.SaveDraftAtHead(changeset, usr, r.URL.Query().Get("msg"), now)
 		if err != nil {
 			return err
 		}

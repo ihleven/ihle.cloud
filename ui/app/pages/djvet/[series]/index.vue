@@ -84,6 +84,11 @@
 //
 // The overview shows a series as a row because it shows eight of them at once;
 // here there is one, so it gets the shelf's own grid and can be made larger.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const route = useRoute()
 const slug = computed(() => String(route.params.series ?? ''))
 

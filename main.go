@@ -243,49 +243,6 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	// root, so the fallback is the shared material and not the film store.
 	drives := hidrive.NewAPI(hitokens, hidrive.Shared{Alias: flags.MediaAlias, Root: flags.DriveRoot})
 
-	// The shared video library: one alias, one root, decided here and not per
-	// request. Everyone entitled to it sees the same shelf, which is what makes
-	// the entitlement the only gate and the responses cacheable by URL. Its own
-	// root rather than the media or drive one, on the same reasoning that keeps
-	// those two apart: the root is the containment.
-	var mediathek *hidrive.Library
-	if flags.MediaAlias != "" && flags.MediathekRoot != "" {
-		mediathek = hidrive.NewLibrary(
-			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.MediathekRoot}, nil),
-			slog.Default(),
-		)
-	}
-
-	// The magazine archive: one shelf again, and its own root, so that a mistake
-	// in either set of routes cannot reach what the other serves.
-	var retro *hidrive.Library
-	if flags.MediaAlias != "" && flags.RetroRoot != "" {
-		retro = hidrive.NewLibrary(
-			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.RetroRoot}, nil),
-			slog.Default(),
-		)
-	}
-
-	// The music shelf: one fixed tree again, and its own root for the reason the
-	// archive has one.
-	var musik *hidrive.Library
-	if flags.MediaAlias != "" && flags.MusikRoot != "" {
-		musik = hidrive.NewLibrary(
-			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.MusikRoot}, nil),
-			slog.Default(),
-		)
-	}
-
-	// The DJ archive: sets rather than albums, arranged in series, and its own
-	// root for the reason the others have theirs.
-	var djvet *hidrive.Library
-	if flags.MediaAlias != "" && flags.DjvetRoot != "" {
-		djvet = hidrive.NewLibrary(
-			hi.NewDrive(hitokens, hi.DriveConfig{Alias: flags.MediaAlias, Root: flags.DjvetRoot}, nil),
-			slog.Default(),
-		)
-	}
-
 	authsvc, err := openAuth(context.Background(), pg, site, flags)
 	if err != nil {
 		log.Fatal("openAuth: ", err)
@@ -297,12 +254,14 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		log.Fatal(err)
 	}
 
-	fapi := familie.NewApi(cms.Repo, cms.Engine)
+	// The CMS's own reader rather than its repository: what used to be a field
+	// holding the old storage layer is now how the manager serves every read.
+	fapi := familie.NewApi(cms.Storage(), cms.Engine)
 
 	// The art archive's own API. Its search is faceted over the artwork fields
 	// (Gattung, Technik, Träger) in a way the generic entry search is not, which
 	// is the whole reason it exists — see /werke.
-	aapi := art.NewApi(cms.Repo, cms.Engine)
+	aapi := art.NewApi(cms.Storage(), cms.Engine)
 
 	// Whoever is signed in here is who the pool is told about. The token is
 	// minted per forwarded request and never given to the browser, so there is
@@ -334,6 +293,9 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	var route = api.WithRoute
 
 	srvr := api.New(
+
+		// The CMS's API, mounted whole rather than re-implemented. See contentapi.go.
+		api.Handler(contentAPIPrefix, contentAPI(cms, authsvc, cmd.Version())),
 
 		api.Handler("/", spa.Serve(flags.SPAPath)),
 
@@ -417,41 +379,11 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		// seeked through; media stays for fetching a file once.
 		route("  GET  /api/v1/drive/stream/{path...}", requireHidrive(authsvc, drives.Stream)),
 
-		// The shared video library. Gated on the mediathek entitlement, not the
-		// hidrive one: being allowed to watch the shelf has nothing to do with
-		// being allowed to browse your own files, and since the library resolves
-		// against a fixed root there is no account-owned tree for the hidrive
-		// rule to be about.
-		route("  GET  /api/v1/mediathek/meta/{path...}  ", requireMediathek(authsvc, mediathek.Meta)),
-		route("  GET  /api/v1/mediathek/stream/{path...}", requireMediathek(authsvc, mediathek.Stream)),
+		// The shelves: the mediathek, the magazines, the music and the DJ sets.
+		// Declared as a list in shelves.go, where the root each is confined to
+		// and the entitlement each demands can be read down one page.
+		shelfRoutes(authsvc, hitokens, flags),
 
-		// The magazine archive. Thumbnails as well as bytes, because an issue is
-		// a hundred-megabyte PDF and what a listing wants is its cover.
-		// No streaming route here, unlike the mediathek: the archive holds
-		// documents, and a reader asks for several pieces of one at once, which
-		// only the store can answer. Serving them the cheap way would answer
-		// such a request with the whole ninety-megabyte scan.
-		route("  GET  /api/v1/retro/meta/{path...}  ", requireRetro(authsvc, retro.Meta)),
-		route("  GET  /api/v1/retro/thumb/{path...} ", requireRetro(authsvc, retro.Thumbnail)),
-		route("  GET  /api/v1/retro/media/{path...} ", requireRetro(authsvc, retro.Media)),
-
-		// The music shelf reads its listings two ways on purpose: meta walks a
-		// level at a time, search reaches the whole shelf in one call. Which is
-		// the better bargain depends on how the shelf is arranged, so the page
-		// can switch between them and be measured rather than argued about.
-		route("  GET  /api/v1/musik/meta/{path...}   ", requireMusik(authsvc, musik.Meta)),
-		route("  GET  /api/v1/musik/search/{path...} ", requireMusik(authsvc, musik.Search)),
-		route("  GET  /api/v1/musik/tags/{path...}   ", requireMusik(authsvc, musik.Tags)),
-		route("  GET  /api/v1/musik/thumb/{path...}  ", requireMusik(authsvc, musik.Thumbnail)),
-		route("  GET  /api/v1/musik/stream/{path...} ", requireMusik(authsvc, musik.Stream)),
-		// The DJ archive. The same five as the music shelf, because it is the
-		// same kind of thing read the same way: a tree of folders holding audio,
-		// pictures beside it, and tags inside the files.
-		route("  GET  /api/v1/djvet/meta/{path...}   ", requireDjvet(authsvc, djvet.Meta)),
-		route("  GET  /api/v1/djvet/search/{path...} ", requireDjvet(authsvc, djvet.Search)),
-		route("  GET  /api/v1/djvet/tags/{path...}   ", requireDjvet(authsvc, djvet.Tags)),
-		route("  GET  /api/v1/djvet/thumb/{path...}  ", requireDjvet(authsvc, djvet.Thumbnail)),
-		route("  GET  /api/v1/djvet/stream/{path...} ", requireDjvet(authsvc, djvet.Stream)),
 		route("  GET  /api/v1/personen/{person}", fapi.PersonHandler),
 		route("  GET  /api/v1/reisen/{key}", fapi.ReiseHandler),
 

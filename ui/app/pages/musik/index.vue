@@ -282,6 +282,11 @@
 //
 // The two ways of reading the shelf are switchable rather than chosen, because
 // which one is better depends on how the shelf grows. See useMusik.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const { shelf: load, cover: covers, track: tracks, tags: readTags } = useMusik()
 
 // The player is the app's, not this page's: an album goes on playing while you

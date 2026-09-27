@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-white">
+  <div class="min-h-full w-full bg-white">
     <!-- <SearchBox /> -->
     <section class="flex items-center justify-center p-4">
       <UInput
@@ -159,6 +159,9 @@
 
 <script setup lang="ts">
 definePageMeta({
+  // The page paints its own bg-white, so the band under the strip has to arrive
+  // at that and not at the colour the layout would otherwise use.
+  shell: { background: 'var(--color-white)' },
   middleware: [
     function (to, from) {
       const { session } = useAuth()

@@ -22,10 +22,6 @@
 @source "../../../../../cms/ui/layers/entry";
 @source "../../../layers/geheimtipp";
 
-:root {
-  --ui-header-height: --spacing(12);
-}
-
 /* iA Writer, served from here rather than fetched.
  *
  * Three families of one typeface, differing in how much room each letter gets:
@@ -110,6 +106,22 @@
   --font-mono: "iA Writer Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-duo: "iA Writer Duo", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-quattro: "iA Writer Quattro", ui-sans-serif, system-ui, sans-serif;
+
+  /* How wide the strip along the top is allowed to get.
+     On a wide screen the wordmark and the round menu button would otherwise sit
+     in the far corners of the window, a foot apart from anything they belong
+     with. Held here rather than written into each of them, because the bar and
+     the button are drawn by two components and have to agree: a difference
+     between them is the button hanging off the end of its own line. */
+  --shell-width: 80rem;
+
+  /* How tall the row inside the strip is.
+     Taller than the row needs, deliberately — AppBar says why. Held here
+     because the strip is no longer the only thing that has to know: the layout
+     tells an embedded module how much of the window is already spent above it,
+     and a module framed against a strip of the wrong height is a scrollbar on a
+     page that should have none. */
+  --bar-height: 3.375rem;
 
   --text-shadow-outline-black: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
   --text-shadow-outline-black-thin: -0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000;

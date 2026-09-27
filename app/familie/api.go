@@ -5,13 +5,21 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/mgmt/search"
 	"github.com/interhome-group/cms/pkg/errs"
-
-	"github.com/interhome-group/cms/mgmt/gitrepo"
 )
 
-func NewApi(repo *gitrepo.Sitory, eng *search.Engine) *api {
+// entries is all this API wants of the CMS: one entry, read by its path.
+//
+// Named here rather than taken from the CMS so that what this package depends
+// on is what it uses. It is satisfied by the manager's own reader —
+// mgmt.Mngr.Storage() — which is how these pages are served.
+type entries interface {
+	GetEntry(path string) (*content.Entry, error)
+}
+
+func NewApi(repo entries, eng *search.Engine) *api {
 
 	api := &api{repo: repo, engine: eng}
 
@@ -19,7 +27,7 @@ func NewApi(repo *gitrepo.Sitory, eng *search.Engine) *api {
 }
 
 type api struct {
-	repo   *gitrepo.Sitory
+	repo   entries
 	engine *search.Engine
 }
 

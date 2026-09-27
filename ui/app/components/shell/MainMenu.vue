@@ -8,7 +8,10 @@
        two stack instead. -->
   <div>
     <div class="grid grid-cols-1 divide-y divide-default sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-      <UNavigationMenu :items="items" orientation="vertical" class="pb-4 sm:pr-4 sm:pb-0" />
+      <!-- The same grouping as the bar, but headed sections rather than
+           dropdowns: there is a column's worth of room here, so nothing has to
+           be put behind a second click. -->
+      <UNavigationMenu :items="sections" orientation="vertical" class="pb-4 sm:pr-4 sm:pb-0" />
       <AuthPanel class="pt-4 sm:pt-0 sm:pl-4" />
     </div>
 
@@ -32,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-const { items } = useAreas()
+const { sections } = useAreas()
 const { standalone } = useStandalone()
 
 // The page as it is, not the front page: reloading is for getting out of a

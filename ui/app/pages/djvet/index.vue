@@ -70,6 +70,11 @@
 // Arranged like the magazines rather than like the record shelf, because this
 // collection is arranged and that one is not: a series is a run somebody made,
 // so it is a heading with its CDs beneath it, not one wall to be searched.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const { archive: load } = useDjvet()
 
 const { data: archive, pending, error } = await useAsyncData('djvet-archive', () => load())

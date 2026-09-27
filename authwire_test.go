@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ihleven/ihlvn/app/auth"
+	"github.com/ihleven/ihlvn/app/cmsauth"
 	"github.com/interhome-group/cms/pkg/errs"
 )
 
@@ -157,5 +158,92 @@ func TestRequireHidrive(t *testing.T) {
 				t.Errorf("status = %d, want %d", status, tt.wantStatus)
 			}
 		})
+	}
+}
+
+// The preview's gate, which is a capability and not an area.
+//
+// It was first written as the Content area entitlement — "may you be shown the
+// editor" — standing in for "may you read a file while writing content". Those
+// are different questions with different holders, and the cases below are the
+// two the substitution got wrong: somebody who edits content but has no reason
+// to be offered the area, and somebody offered the area who holds nothing else.
+func TestRequireMediaRead(t *testing.T) {
+	tests := []struct {
+		name        string
+		permissions []string
+		wantStatus  int
+		wantReached bool
+	}{{
+		name: "an account holding the right", permissions: []string{"media.read"},
+		wantStatus: http.StatusOK, wantReached: true,
+	}, {
+		// "*" expands to every registered permission when the scope is built.
+		name: "a superuser", permissions: []string{"*"},
+		wantStatus: http.StatusOK, wantReached: true,
+	}, {
+		// What the old gate accepted and this one does not: being shown the
+		// editor is not the same as being allowed to read the store.
+		name: "an account entitled to the editor area only", permissions: []string{"module.content"},
+		wantStatus: http.StatusForbidden,
+	}, {
+		// And what the old gate refused: authoring without the area in the menu.
+		name: "an account that may write content", permissions: []string{"entry.create"},
+		wantStatus: http.StatusForbidden,
+	}, {
+		name: "an account holding nothing", permissions: nil,
+		wantStatus: http.StatusForbidden,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			account := &auth.Account{
+				Name: "someone",
+				CMS:  auth.CMSProfile{Permissions: tt.permissions},
+			}
+
+			reached := false
+			h := requirePermission(signedInAs{account}, cmsauth.MediaRead, "nope",
+				func(w http.ResponseWriter, _ *http.Request) error {
+					reached = true
+					w.WriteHeader(http.StatusOK)
+
+					return nil
+				})
+
+			w := httptest.NewRecorder()
+			err := h(w, httptest.NewRequest(http.MethodGet, "/api/v1/media/stream/a.mp4", nil))
+			_ = w
+
+			if reached != tt.wantReached {
+				t.Errorf("handler reached = %v, want %v", reached, tt.wantReached)
+			}
+			if tt.wantStatus == http.StatusOK {
+				if err != nil {
+					t.Fatalf("an account holding the right was refused: %v", err)
+				}
+
+				return
+			}
+			if err == nil {
+				t.Fatal("the request was allowed through")
+			}
+			if status := errs.StatusOf(err); status != tt.wantStatus {
+				t.Errorf("status = %d, want %d", status, tt.wantStatus)
+			}
+		})
+	}
+}
+
+// Nobody signed in is a different refusal from somebody without the right, and
+// the difference is the one that sent me chasing the wrong thing for an hour:
+// 401 means the server could not tell who is asking, 403 means it could.
+func TestRequireMediaReadRefusesAnonymouslyWith401(t *testing.T) {
+	h := requirePermission(signedInAs{}, cmsauth.MediaRead, "nope",
+		func(http.ResponseWriter, *http.Request) error { return nil })
+
+	err := h(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/media/stream/a.mp4", nil))
+	if status := errs.StatusOf(err); status != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", status, http.StatusUnauthorized)
 	}
 }

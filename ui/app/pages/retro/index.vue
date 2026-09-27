@@ -123,6 +123,11 @@
 // one to show it — the covers are rendered by the storage, and the scan is
 // opened only when somebody asks for it, from a route that serves ranges so a
 // reader can jump about in it without fetching the whole thing.
+
+// The page paints its own bg-elevated, so the band under the strip has to arrive
+// at that and not at the colour the layout would otherwise use.
+definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+
 const { shelf: load } = useRetro()
 
 type Reader = 'app' | 'system'

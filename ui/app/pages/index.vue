@@ -25,46 +25,96 @@
 
   <!-- Everyone else: the areas this account has, inside the app's own chrome. -->
   <NuxtLayout v-else name="default">
-    <!-- Two columns until there is room to auto-fit 200px tiles. A phone is
-         360–390px wide, so auto-fit on its own drops to one column and the page
-         becomes a long scroll of a single tile at a time.
+    <!-- A wall of mixed blocks rather than a table of equal squares. The cell
+         is 11rem, which on a 360px phone is two columns — small enough that a
+         wide tile is the screen and not more than it — and on a laptop is
+         seven or so.
 
-         w-full, not w-screen: this sits inside UMain, which is a flex
+         auto-fill and not auto-fit: auto-fit collapses the columns nobody is
+         using, which on a page with three tiles on it stretches those three
+         across the whole window and undoes the sizes entirely.
+
+         Deliberately not `dense`. A block that will not fit at the end of a row
+         moves to the next and leaves the remainder empty, and that hole is the
+         point of the exercise — dense packing closes every one of them and
+         gives back the slab.
+
+         w-full, not w-screen: this sits inside the layout's <main>, a flex
          container, and 100vw is the viewport including any scrollbar — wider
          than the space it has been given. The overflow shows as a pale strip
          down the right and a page that scrolls sideways. -->
-    <main class="grid w-full grid-cols-2 content-start sm:grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]">
-      <section class="flex items-center justify-between bg-ral-7035">
+    <main
+      ref="grid"
+      class="grid w-full auto-rows-[14rem] grid-cols-[repeat(auto-fill,_minmax(14rem,_1fr))] content-start"
+    >
+      <section class="col-span-1 row-span-1 flex items-center justify-between bg-ral-7035">
         <Logo />
       </section>
 
       <!-- Only the areas this account is entitled to. Someone who may see one
            thing gets one tile, not a wall of doors that refuse to open. -->
-      <template v-for="tile in tiles" :key="tile.label">
+      <template v-for="{ tile, class: span, key } in laid" :key="key">
+        <!-- A hole: the page's own background, showing through. Rendered rather
+             than left out, because a gap in a packed grid is not an absence of
+             an element — the next tile simply moves up into it. -->
+        <div v-if="!tile" :class="span" />
+
         <!-- The calendar tile is the calendar's own date block rather than a
              label: it says what day it is, and each part of the date is a way
              into the page for that part. Which is why it cannot be one link
              like the others — an anchor inside an anchor is not a thing a
              browser will render. -->
         <div
-          v-if="tile.module === 'kalender'"
-          class="aspect-square p-4 sm:p-6"
-          :class="tile.class"
+          v-else-if="tile.module === 'kalender'"
+          class="p-4 sm:p-6"
+          :class="[tile.class, span]"
         >
           <KalenderHero variant="tile" />
         </div>
 
+        <!-- Three layers, and no z-index between them: each is positioned and
+             each comes after the last, which is all CSS needs to stack them —
+             see main.css. The picture, a scrim dark enough to carry the label
+             over whatever the picture happens to be doing in that corner, and
+             the label. -->
         <NuxtLink
           v-else
           :to="tile.to"
-          class="block aspect-square p-8"
-          :class="tile.class"
+          class="tile relative block overflow-hidden p-8"
+          :class="[tile.class, span]"
         >
-          <h1 class="text-lg font-black text-white hover:text-outline">{{ tile.label }}</h1>
+          <!-- Two nested elements for one picture, because two things move it
+               and a transform is one property. The frame drifts with the page;
+               the picture inside it grows under the pointer. Written on one
+               element they would overwrite each other, and the scroll one —
+               being an animation rather than a transition — would win. -->
+          <span v-if="tile.photo" class="tile-frame pointer-events-none absolute inset-x-0">
+            <img
+              :src="tile.photo"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              class="tile-photo absolute inset-0 size-full object-cover"
+            >
+          </span>
+          <span v-if="tile.photo" class="tile-scrim pointer-events-none absolute inset-0" />
+
+          <!-- On a photograph the outline is worn always, not on hover. A
+               picture is not one colour: the scrim holds the corner down but
+               the film reels are near-white exactly where the label sits, and
+               white on near-white is legible in the way a thing can be legible
+               and still not be worth reading. The calendar tile settled this
+               same question the same way. A flat tile keeps the outline for
+               hover, where it is an answer to the pointer rather than a
+               repair. -->
+          <h1
+            class="tile-label relative text-lg font-black text-white"
+            :class="tile.photo ? 'text-outline' : 'hover:text-outline'"
+          >{{ tile.label }}</h1>
         </NuxtLink>
       </template>
 
-      <p v-if="!tiles.length" class="col-span-full p-8 text-muted">
+      <p v-if="!laid.length" class="col-span-full p-8 text-muted">
         Für dieses Konto ist noch nichts freigeschaltet.
       </p>
 
@@ -78,9 +128,9 @@
            else. -->
       <NuxtLink
         to="/godoc"
-        class="block aspect-square bg-yellow-500/80 p-8"
+        class="col-span-1 row-span-1 block bg-yellow-500/80 p-8"
       >
-        <h1 class="text-lg font-black text-white hover:text-outline">Dokumentation</h1>
+        <h1 class="tile-label text-lg font-black text-white hover:text-outline">Dokumentation</h1>
       </NuxtLink>
     </main>
   </NuxtLayout>
@@ -110,6 +160,12 @@ definePageMeta({ layout: false })
 const { session } = useAuth()
 const { allowed } = useModules()
 
+// The labels are given a little weight, so scrolling swings them and stopping
+// settles them back. On the grid rather than on each label: one loop, one style
+// write, and every label reads the result by inheritance.
+const grid = ref<HTMLElement | null>(null)
+useScrollGravity(grid)
+
 // A confined account is reported as entitled to the pool and nothing else, by
 // its type rather than by its permissions; see Service.offered.
 const confined = computed(() =>
@@ -122,8 +178,24 @@ const confined = computed(() =>
 // how it looks is utils/modules — the same list the navigation and the route
 // guard read, so a new area appears in all three or in none.
 const tiles = computed(() => allowed(
-  tileModules().map(m => ({ module: m.id, label: m.tile!.label, to: m.at, class: m.tile!.class })),
+  tileModules().map(m => ({
+    module: m.id,
+    label: m.tile!.label,
+    to: m.at,
+    class: m.tile!.class,
+    photo: m.tile!.photo,
+    shapes: m.tile!.shapes,
+  })),
 ))
+
+// The arrangement: a shuffled order and a shape apiece, dealt from one number.
+//
+// Held in Nuxt state rather than worked out on every mount, so it is rolled
+// once when the app is opened and stays put while it is being used. Re-rolled
+// per mount, coming back from a tile would find the page rearranged — which
+// does not read as variety, it reads as having pressed the wrong thing.
+const arrangement = useState('tile-mosaic', () => Math.random())
+const laid = computed(() => mosaic(tiles.value, arrangement.value))
 </script>
 
 <!-- Carried over from ihleven.de's own front page so the door looks the way it
@@ -207,6 +279,145 @@ const tiles = computed(() => allowed(
 
 @media (prefers-reduced-motion: reduce) {
   .tile-kalender {
+    animation: none;
+  }
+}
+
+/* What the gravity loop spends its number on.
+   Nothing but a translate, so it stays on the compositor and costs no layout —
+   twelve labels moving four pixels must not reflow a grid. The fallback of 0px
+   is what shows before the first frame, and the whole of what shows when the
+   loop never starts: reduced motion, or a browser with no JavaScript running
+   yet. The label is simply where it was drawn. */
+.tile-label {
+  transform: translateY(var(--gravity, 0px));
+}
+
+/* A tile with a photograph, and the three things that move it.
+   Nothing here is meant to be noticed on its own: a grid of squares that all
+   breathe at once is a screensaver. Each movement is the smallest one that
+   still reads as a response.
+
+   The picture is drawn a little larger than the square and offset upwards, so
+   there is something to slide: the frame drifts by 4% of its own height in each
+   direction and 12% of spare height is exactly enough that no edge is ever
+   pulled into view. */
+.tile-frame {
+  top: -6%;
+  height: 112%;
+}
+
+/* Starting a touch over 1 leaves room for the press below to go *down* without
+   uncovering a corner, and hides the half-pixel seam a scaled image can show
+   against the tile edge. */
+.tile-photo {
+  transform: scale(1.02);
+  transition:
+    transform 700ms cubic-bezier(0.2, 0.6, 0.2, 1),
+    filter 700ms ease;
+}
+
+/* Hover: the picture grows, slowly, and lifts a little out of the scrim.
+   700ms in and the same out — a zoom that snaps back is a flinch. */
+.tile:hover .tile-photo {
+  transform: scale(1.08);
+  filter: saturate(1.15) brightness(1.06);
+}
+
+/* Click: the whole square presses in and comes back. Short, because a press is
+   an answer rather than a transition, and on the tile rather than the picture
+   so the label goes down with it — a picture that shrinks under a label that
+   does not is a picture coming loose.
+
+   The photo's own transition is overridden to match, or the press would take
+   700ms to arrive and the pointer would be gone before it did. */
+.tile {
+  transition: transform 260ms cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+.tile:active {
+  transform: scale(0.975);
+  transition-duration: 110ms;
+}
+
+.tile:active .tile-photo {
+  transform: scale(1.04);
+  transition-duration: 110ms;
+}
+
+/* The scrim exists for the label, not for the picture. Darkest in the top-left
+   corner where the label sits and gone by the middle, so the photograph is
+   mostly itself — a flat wash over the whole square would make four grey
+   squares out of four photographs.
+
+   The second stop is the insurance: a hand-picked corner gradient is only right
+   until somebody swaps a photograph for a paler one, and a tenth of black
+   across the whole square costs nothing to look at and keeps white legible on
+   anything. */
+.tile-scrim {
+  background:
+    linear-gradient(135deg, rgb(0 0 0 / 55%) 0%, rgb(0 0 0 / 25%) 35%, rgb(0 0 0 / 0%) 65%),
+    linear-gradient(rgb(0 0 0 / 10%) 0%, rgb(0 0 0 / 10%) 100%);
+}
+
+/* Scroll: the picture drifts against the page as the tile crosses the viewport.
+   A scroll-driven animation rather than a scroll listener — the browser runs it
+   off the same timeline it scrolls with, so there is no work on the main thread
+   and nothing to throttle.
+
+   Behind @supports on purpose. Where view() is not understood the whole rule is
+   skipped and the tile is simply a tile with a photograph in it, which is the
+   right thing to degrade to. background-attachment: fixed would have been the
+   old way to get this and is the reason not to: iOS has never run it properly,
+   and this app is mostly read on a phone. */
+@supports (animation-timeline: view()) {
+  /* The timeline is named on the tile and used inside it, rather than the
+     frame simply asking for view() — and that indirection is not decoration.
+     A bare view() measures the element against its nearest scrollport, and the
+     tile is `overflow-hidden` to clip the zoom, which *makes* it one. The frame
+     never moves inside the tile, so the timeline sat frozen at half progress
+     and the drift did precisely nothing. Named on the tile, it is measured
+     against the page, which is the thing the picture is supposed to drift
+     against. */
+  .tile {
+    view-timeline-name: --tile;
+  }
+
+  .tile-frame {
+    animation: tile-drift linear both;
+    animation-timeline: --tile;
+
+    /* The whole time the tile is on screen, entering to leaving, so the drift
+       is one unbroken pass rather than something that finishes early and then
+       sits still in the middle of the screen. */
+    animation-range: cover 0% cover 100%;
+  }
+}
+
+@keyframes tile-drift {
+  from {
+    transform: translateY(-4%);
+  }
+
+  to {
+    transform: translateY(4%);
+  }
+}
+
+/* Asked not to animate: the pictures stay, all three movements go. What is left
+   is a grid of photographs that responds to nothing, which is what was asked
+   for — the tiles still look like themselves. */
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tile-photo,
+  .tile:hover .tile-photo,
+  .tile:active,
+  .tile:active .tile-photo {
+    transition: none;
+    transform: none;
+  }
+
+  .tile-frame {
     animation: none;
   }
 }

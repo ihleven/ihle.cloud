@@ -89,11 +89,13 @@ Verwalten
 
 # Github-Projekte
 
+## ihleven
+
 ### ihle.cloud 
 -> dieses Projekt
-- sollte umbenannt werden
+- sollte in ihlvn umbenannt werden
 
-### drive Private
+### drive 
 ganz alt, integrieren in ihlvn, dann löschen
 war wohl erste version
 alte arbeit funktionalität war hier, 2021 -> ihle-cloud
@@ -101,30 +103,35 @@ alte arbeit funktionalität war hier, 2021 -> ihle-cloud
 ### ihle-cloud 
 arbeit aus drive im November 2021 übernommen
 
-### art 
-3 commits 2024 + 2025
-war ein Versuch das Kunstarchiv neu aufzusetzen
+### art (gelöscht)
+- 3 commits 2024 + 2025, war ein Versuch das Kunstarchiv und die Famlienapp mit Passkeys neu aufzusetzen
+- In Ihlvn integriert und gelöscht am 20.9.2026
 
+### wolfgang-ihle 
+- altes Kunst archiv
+- das was auf tschabrun.eu installiert ist
+- akuteller Branch: go-cli
 
-
+## Geheimtipp/Tippspile
 
 ### geheimtipp
-Geheimtipp nuxt3 frontend
+- Geheimtipp nuxt3 frontend
+- bereits in ihleven integriert
+
 ### goheimtipp 
 Private Geheimtipp cli
-### wolfgang-ihle Private
-wahrscheinlich das was auf tschabrun.eu installiert ist
+
  
- ### Webseiten
+## Webseiten
 - wolfgangihle: www.wolfgang-ihle.de
 - tierklinik-nuxt: tierklinik-tschabrun.com
 - equiluz: equiluz.at
 
-### cms content  
-- cms-content Private
-- cms-content-test Private
+## CMS Content  
+- cms-content: Private Inhalte
+- cms-content-test test repo für CMS
 
-### mirrors
+## Mirrors
 - cms Privat
 - webcc-tool-api Private
 - webcc-elastic Private

@@ -22,4 +22,21 @@
 //
 // The chrome is the app's own. The old page drew its own navigation bar because
 // it had no layout to put it in.
+
+// The page is bg-elevated, but nothing of it is visible at the top: the green
+// band saying what day it is sits directly under the strip, so that is what the
+// fade has to arrive at. Fading to the grey instead would not remove the line —
+// it would move it down by the height of the band.
+definePageMeta({
+  shell: {
+    background: 'var(--ui-bg-elevated)',
+    bandTo: 'var(--color-green-500)',
+    // Through a pale green rather than straight from white. White to a
+    // saturated green in one step passes through a grey-green nothing in the
+    // palette is, and it is the part of the ramp the eye reads as dirty; going
+    // by way of the ramp's own 200 keeps the whole band in the greens. Held
+    // late, so the colour arrives near the block rather than filling the band.
+    bandVia: 'var(--color-green-200) 72%',
+  },
+})
 </script>

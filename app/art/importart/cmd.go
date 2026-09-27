@@ -85,7 +85,6 @@ func (cmd *ImportCmd) Run(cms *mgmt.Mngr) error {
 					Slug:     a.Slug,
 					FullSlug: "ausstellungen/" + a.Slug,
 					Type:     "Ausstellung",
-					MIME:     "application/json",
 				},
 				Content: &art.Ausstellung{
 					ID:         a.ID,
@@ -141,18 +140,16 @@ func (cmd *ImportCmd) Run(cms *mgmt.Mngr) error {
 			}
 			entry := content.Entry{
 				Meta: content.Meta{
-					Path:       fmt.Sprintf("artworks/%d.json", b.ID),
-					Locale:     "de",
-					Version:    string(content.DRAFT),
-					Status:     content.ACTIVE,
-					Slug:       strings.TrimPrefix(b.Directory, "bilder/"),
-					FullSlug:   b.Directory,
-					Access:     content.Access{},
-					ID:         strconv.Itoa(b.ID),
-					Collection: "artworks", Space: "wi",
-					Repo: "content",
-					Name: "Bild " + b.Titel, Notes: b.Kommentar, Tags: nil,
-					MIME: "application/json",
+					Path:     fmt.Sprintf("artworks/%d.json", b.ID),
+					Locale:   "de",
+					Status:   content.ACTIVE,
+					Slug:     strings.TrimPrefix(b.Directory, "bilder/"),
+					FullSlug: b.Directory,
+					Access:   content.Access{},
+					ID:       strconv.Itoa(b.ID),
+					Space:    "wi",
+					Repo:     "content",
+					Name:     "Bild " + b.Titel, Notes: b.Kommentar, Tags: nil,
 					Type: "Work",
 				},
 				Content: &wa,
@@ -179,14 +176,14 @@ func (cmd *ImportCmd) Run(cms *mgmt.Mngr) error {
 		return fmt.Errorf("--write needs a content repository: set REPO_CONTENT")
 	}
 
-	// Staged and then published, which is how every other write in this app
-	// reaches the branch (see app/cmsapi/handlers.go). Publishing is a separate
-	// act: staging records the work on a ref of its own, and only the publish
-	// moves the branch other readers see.
+	// Saved as a draft and then published, which is how every other write in
+	// this app reaches the branch (see app/cmsapi/handlers.go). Publishing is a
+	// separate act: the draft records the work on a ref of its own, and only the
+	// publish moves the branch other readers see.
 	now := time.Now()
 	msg := fmt.Sprintf("import %d entries from %s", len(changeset), cmd.DBToImportConnString)
 
-	draft, err := cms.StageAtHead(changeset, usr, msg, now)
+	draft, err := cms.SaveDraftAtHead(changeset, usr, msg, now)
 	if err != nil {
 		return err
 	}
