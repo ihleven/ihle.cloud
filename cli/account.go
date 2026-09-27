@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bufio"
@@ -40,13 +40,27 @@ type AccountCmd struct {
 	BaseURL string        `arg:"--base-url,env:PUBLIC_URL" default:"http://localhost:8000" help:"base URL for enrollment links. Shares PUBLIC_URL with the server, so a link issued on the server points at the right host without being told twice"`
 }
 
-func (c *AccountCmd) Run(flags Flags) error {
+// Accounts is what the account command needs from the application's
+// configuration, which is two values out of several dozen.
+//
+// Named rather than handed the whole configuration: a command that administers
+// accounts has no business being able to read where the media drive is, and a
+// parameter list is where that stays true.
+type Accounts struct {
+	// DbConn is the account database.
+	DbConn string
+	// MinPasswordLength is the policy a new password is measured against, and
+	// is the server's so that both halves refuse the same passwords.
+	MinPasswordLength int
+}
+
+func (c *AccountCmd) Run(conf Accounts) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	pg, err := db.New(flags.DbConn)
+	pg, err := db.New(conf.DbConn)
 	if err != nil {
-		return fmt.Errorf("connecting to %s: %w", flags.DbConn, err)
+		return fmt.Errorf("connecting to %s: %w", conf.DbConn, err)
 	}
 	defer pg.Close()
 
@@ -55,7 +69,7 @@ func (c *AccountCmd) Run(flags Flags) error {
 	if err := db.Migrate(ctx, pg.Pool()); err != nil {
 		return err
 	}
-	admin := auth.NewAdmin(auth.NewStore(pg.Pool()), c.BaseURL, c.TTL, flags.MinPasswordLength)
+	admin := auth.NewAdmin(auth.NewStore(pg.Pool()), c.BaseURL, c.TTL, conf.MinPasswordLength)
 
 	switch c.Action {
 	case "", "list":

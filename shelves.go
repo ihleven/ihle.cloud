@@ -5,9 +5,10 @@ import (
 	"net/http"
 
 	"github.com/ihleven/ihlvn/app/cmsauth"
+	"github.com/ihleven/ihlvn/app/gate"
 	"github.com/ihleven/ihlvn/app/hidrive"
-	"github.com/ihleven/ihlvn/pkg/api"
 	"github.com/ihleven/ihlvn/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/srvr"
 	"github.com/interhome-group/cms/content"
 )
 
@@ -140,8 +141,8 @@ func (s shelf) pattern(op string) string {
 }
 
 // routes declares one shelf: every operation it offers, behind its entitlement.
-func (s shelf) routes(svc authenticator, lib *hidrive.Library) []func(*api.Api) {
-	opts := make([]func(*api.Api), 0, len(s.ops))
+func (s shelf) routes(svc gate.Authenticator, lib *hidrive.Library) []func(*srvr.Api) {
+	opts := make([]func(*srvr.Api), 0, len(s.ops))
 	for _, name := range s.ops {
 		op, ok := libraryOps[name]
 		if !ok {
@@ -150,20 +151,20 @@ func (s shelf) routes(svc authenticator, lib *hidrive.Library) []func(*api.Api) 
 			panic("unknown shelf operation: " + name)
 		}
 		handler := func(w http.ResponseWriter, r *http.Request) error { return op(lib, w, r) }
-		opts = append(opts, api.WithRoute(s.pattern(name), requirePermission(svc, s.right, s.refusal, handler)))
+		opts = append(opts, srvr.WithRoute(s.pattern(name), gate.Permission(svc, s.right, s.refusal, handler)))
 	}
 
 	return opts
 }
 
 // shelfRoutes declares every shelf, as one option.
-func shelfRoutes(svc authenticator, tokens hi.TokenSource, flags Flags) func(*api.Api) {
-	var opts []func(*api.Api)
+func shelfRoutes(svc gate.Authenticator, tokens hi.TokenSource, flags Flags) func(*srvr.Api) {
+	var opts []func(*srvr.Api)
 	for _, s := range shelves(flags) {
 		opts = append(opts, s.routes(svc, s.library(tokens, flags.MediaAlias))...)
 	}
 
-	return func(a *api.Api) {
+	return func(a *srvr.Api) {
 		for _, opt := range opts {
 			opt(a)
 		}

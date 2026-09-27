@@ -1,4 +1,4 @@
-package main
+package gate
 
 import (
 	"net/http"
@@ -53,7 +53,7 @@ func TestRequireAdmin(t *testing.T) {
 			}
 
 			reached := false
-			h := requireAdmin(signedInAs{account}, func(w http.ResponseWriter, _ *http.Request) error {
+			h := Admin(signedInAs{account}, func(w http.ResponseWriter, _ *http.Request) error {
 				reached = true
 				w.WriteHeader(http.StatusOK)
 				return nil
@@ -85,7 +85,7 @@ func TestRequireAdmin(t *testing.T) {
 // fixable by signing in, the other is not, and a client that cannot tell them
 // apart will offer the wrong remedy.
 func TestRequireAdminRefusesAnonymously(t *testing.T) {
-	h := requireAdmin(signedInAs{nil}, func(http.ResponseWriter, *http.Request) error {
+	h := Admin(signedInAs{nil}, func(http.ResponseWriter, *http.Request) error {
 		t.Error("the handler ran for a request with no account")
 		return nil
 	})
@@ -134,7 +134,7 @@ func TestRequireHidrive(t *testing.T) {
 			account.HiDrive.Alias = "matt.ihle"
 
 			reached := false
-			h := requireHidrive(signedInAs{account}, func(w http.ResponseWriter, _ *http.Request) error {
+			h := Hidrive(signedInAs{account}, func(w http.ResponseWriter, _ *http.Request) error {
 				reached = true
 				w.WriteHeader(http.StatusOK)
 				return nil
@@ -203,7 +203,7 @@ func TestRequireMediaRead(t *testing.T) {
 			}
 
 			reached := false
-			h := requirePermission(signedInAs{account}, cmsauth.MediaRead, "nope",
+			h := Permission(signedInAs{account}, cmsauth.MediaRead, "nope",
 				func(w http.ResponseWriter, _ *http.Request) error {
 					reached = true
 					w.WriteHeader(http.StatusOK)
@@ -239,7 +239,7 @@ func TestRequireMediaRead(t *testing.T) {
 // the difference is the one that sent me chasing the wrong thing for an hour:
 // 401 means the server could not tell who is asking, 403 means it could.
 func TestRequireMediaReadRefusesAnonymouslyWith401(t *testing.T) {
-	h := requirePermission(signedInAs{}, cmsauth.MediaRead, "nope",
+	h := Permission(signedInAs{}, cmsauth.MediaRead, "nope",
 		func(http.ResponseWriter, *http.Request) error { return nil })
 
 	err := h(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/media/stream/a.mp4", nil))

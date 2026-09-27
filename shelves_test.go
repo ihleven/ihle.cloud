@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/ihleven/ihlvn/app/cmsauth"
@@ -139,37 +138,5 @@ func TestEveryShelfOperationIsImplemented(t *testing.T) {
 				t.Errorf("%s asks for operation %q, which does not exist", s.prefix, op)
 			}
 		}
-	}
-}
-
-// The addresses have to be registrable together.
-//
-// Go's router refuses two patterns when a request would match both and neither
-// is the more specific, and it refuses them by panicking as the server starts —
-// which no build and no type check will tell you about. It is what stopped the
-// server on Friday: a media route written under /films/ collided with
-// /films/{id}/poster.jpg, because "/films/media/poster.jpg" matches both.
-//
-// So the film addresses are registered here beside the shelves, since the thing
-// that has to hold is the whole space rather than each family within it. It is
-// still only part of the table — most routes are declared inline where the
-// server is built and cannot be enumerated from a test — so this proves the
-// families that can collide with each other, not the table entire.
-func TestTheAddressesCanBeRegisteredTogether(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("the routes cannot be registered together: %v", r)
-		}
-	}()
-
-	filmAddresses := []string{
-		"GET /api/v1/films/{id}",
-		"GET /api/v1/films/{id}/poster.jpg",
-		"GET /api/v1/films/{id}/chapters.vtt",
-	}
-
-	mux := http.NewServeMux()
-	for _, pattern := range append(addresses(t), filmAddresses...) {
-		mux.HandleFunc(pattern, func(http.ResponseWriter, *http.Request) {})
 	}
 }

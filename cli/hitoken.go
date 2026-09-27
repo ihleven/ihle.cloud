@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -23,15 +23,26 @@ type HiTokenCmd struct {
 	Check bool `arg:"--check" help:"ask HiDrive whether each stored token still works (one request per alias)"`
 }
 
-func (c *HiTokenCmd) Run(flags Flags) error {
+// Tokens is what the token command needs from the application's configuration.
+// The credentials are the server's own, because a token is only meaningful to
+// the client it was issued to.
+type Tokens struct {
+	DbConn       string
+	ClientID     string
+	ClientSecret string
+	// PublicURL is where the authorisation link in the report points.
+	PublicURL string
+}
+
+func (c *HiTokenCmd) Run(conf Tokens) error {
 	// The check talks to HiDrive once per alias, so this is generous rather
 	// than instant.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	pg, err := db.New(flags.DbConn)
+	pg, err := db.New(conf.DbConn)
 	if err != nil {
-		return fmt.Errorf("connecting to %s: %w", flags.DbConn, err)
+		return fmt.Errorf("connecting to %s: %w", conf.DbConn, err)
 	}
 	defer pg.Close()
 
@@ -43,14 +54,14 @@ func (c *HiTokenCmd) Run(flags Flags) error {
 	}
 
 	statuses, err := hidrive.InspectTokens(ctx, hidrive.NewStore(pg.Pool()),
-		flags.HidriveClientID, flags.HidriveClientSecret, c.Check)
+		conf.ClientID, conf.ClientSecret, c.Check)
 	if err != nil {
 		return err
 	}
 	if len(statuses) == 0 {
 		return errors.New("no rows in hitoken: authorise an alias at /apihle/auth/authorize first")
 	}
-	return reportHiTokens(statuses, flags.PublicURL, os.Stdout)
+	return reportHiTokens(statuses, conf.PublicURL, os.Stdout)
 }
 
 func reportHiTokens(statuses []hidrive.TokenStatus, publicURL string, out io.Writer) error {

@@ -3,10 +3,12 @@ package main
 import (
 	"net/http"
 
+	"github.com/ihleven/ihlvn/app/gate"
+	"github.com/ihleven/ihlvn/pkg/srvr"
 	"github.com/interhome-group/cms/httpapi"
 	"github.com/interhome-group/cms/mgmt"
 	"github.com/interhome-group/cms/mgmt/controller"
-	contentapi "github.com/interhome-group/cms/pkg/api"
+	"github.com/interhome-group/cms/pkg/api"
 )
 
 // contentAPIPrefix is where the CMS's API is served, and it is the CMS's own
@@ -32,10 +34,14 @@ const contentAPIPrefix = "/content-api/v1/"
 // Accounts, assets and pages are deliberately not mounted: this app administers
 // its own accounts, has no asset service behind it, and does not register the
 // CMS's page content types.
-func contentAPI(cms *mgmt.Mngr, svc authenticator, version string) http.Handler {
+func contentAPI(cms *mgmt.Mngr, svc gate.Authenticator, version string) (http.Handler, *srvr.RecordingMux) {
 
-	mux := http.NewServeMux()
-	router := contentapi.New(mux, "ihlvn content API", version, "/content-api/v1")
+	// A recording mux, so what huma mounts here — every operation, plus the
+	// OpenAPI document, the docs UI and the schemas it adds itself — is part of
+	// what this application can say it serves. Registered out of sight
+	// otherwise: the routes below are declared by the CMS, not by our table.
+	mux := srvr.NewRecordingMux()
+	router := api.New(mux, "ihlvn content API", version, "/content-api/v1")
 
 	httpapi.RegisterEntry(router, &controller.EntryController{Mngr: cms})
 	httpapi.RegisterDrafts(router, &controller.DraftController{Mngr: cms})
@@ -44,5 +50,5 @@ func contentAPI(cms *mgmt.Mngr, svc authenticator, version string) http.Handler 
 	httpapi.RegisterInfo(router, &controller.InfoController{Mngr: cms})
 	router.FixGreedyPaths()
 
-	return cmsIdentity(svc, mux)
+	return gate.CMSIdentity(svc, mux), mux
 }

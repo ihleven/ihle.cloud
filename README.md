@@ -151,9 +151,16 @@ Private Geheimtipp cli
 
 ### pkg 
 pkg's for gophers
--> löschen
+-> keine Abhängigkeit mehr, seit cli/hi weg ist. Löschen bringt trotzdem nichts: der Go-Modul-Proxy hält v0.4.0-alpha ohnehin dauerhaft, und wertvoll ist nur die Historie.
+- main (default): errors, hidrive, httpauth, httpsrvr, log, routr, templates — daher kommt der Tag
+- develop: abgezweigte Nebenlinie, am 27.9.2026 ausgeräumt
+  - kalender -> pkg/kalender (mit Tests)
+  - arbeit -> app/arbeit; Storage und Handler ungebaut daneben in _repository/_handler, schema.sql dabei
+  - llist -> pkg/llist
+  - auth, session: kompilierten beide nicht, wertlos. Ideen notiert (Zugang per Code statt Konto, Bearer neben Cookie, Login ohne SPA)
+  - legacy/cloud11-api/drive: von pkg/hi überholt; mitgenommen nur die Bildunterschrift-Idee (Caption/Cutline)
 ### errors Public
--> löschen
+-> v0.1.0, ging mit cli/hi. Keine Abhängigkeit mehr.
 
 
 ### cloud11-webapp 

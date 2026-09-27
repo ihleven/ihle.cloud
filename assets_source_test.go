@@ -29,7 +29,7 @@ func TestGodocFindsThisApplicationsPackages(t *testing.T) {
 	for _, want := range []string{
 		"github.com/ihleven/ihlvn",          // the module root, this package
 		"github.com/ihleven/ihlvn/app/auth", // an app package
-		"github.com/ihleven/ihlvn/pkg/api",  // a pkg package
+		"github.com/ihleven/ihlvn/pkg/srvr", // a pkg package
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("%s is missing from the index — check the embed patterns", want)

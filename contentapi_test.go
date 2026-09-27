@@ -7,10 +7,20 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/ihleven/ihlvn/app/films"
 	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/mgmt"
 )
+
+// nobody is a stand-in for the auth service that never recognises anyone.
+//
+// The gates have their own tests in app/gate; what these need an authenticator
+// for is only that the mount takes one, so the smallest one that satisfies the
+// interface is the honest fixture here.
+type nobody struct{}
+
+func (nobody) Authenticate(*http.Request) (*auth.Account, bool) { return nil, false }
 
 // This app's content types, registered as main() registers them — a test binary
 // does not run main, and without this the CMS's registry holds only its own.
@@ -60,7 +70,8 @@ func emptyRepo(t *testing.T) *mgmt.Mngr {
 // out.
 func TestContentAPIServesThisAppsContentTypes(t *testing.T) {
 	mounted := http.NewServeMux()
-	mounted.Handle(contentAPIPrefix, contentAPI(emptyRepo(t), signedInAs{}, "test"))
+	handler, _ := contentAPI(emptyRepo(t), nobody{}, "test")
+	mounted.Handle(contentAPIPrefix, handler)
 
 	rec := httptest.NewRecorder()
 	mounted.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/content-api/v1/types", nil))
@@ -98,7 +109,7 @@ func TestContentAPIServesThisAppsContentTypes(t *testing.T) {
 // app, and what needs an account refuses for itself. The middleware's job is to
 // say who it is when there is somebody, not to be a gate.
 func TestContentAPIAnswersWithoutAnAccount(t *testing.T) {
-	handler := contentAPI(emptyRepo(t), signedInAs{}, "test")
+	handler, _ := contentAPI(emptyRepo(t), nobody{}, "test")
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/content-api/v1/types", nil))
@@ -111,7 +122,7 @@ func TestContentAPIAnswersWithoutAnAccount(t *testing.T) {
 // Writing does need one, and the controllers enforce that themselves — which is
 // worth pinning, because the middleware above deliberately does not.
 func TestContentAPIRefusesAnAnonymousWrite(t *testing.T) {
-	handler := contentAPI(emptyRepo(t), signedInAs{}, "test")
+	handler, _ := contentAPI(emptyRepo(t), nobody{}, "test")
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/content-api/v1/entries", http.NoBody)

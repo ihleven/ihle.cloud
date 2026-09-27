@@ -17,8 +17,10 @@ import (
 	"github.com/ihleven/ihlvn/app/cmsapi"
 	"github.com/ihleven/ihlvn/app/db"
 	"github.com/ihleven/ihlvn/app/films"
+	"github.com/ihleven/ihlvn/app/gate"
 	"github.com/ihleven/ihlvn/app/geheimtipp"
 	"github.com/ihleven/ihlvn/app/hidrive"
+	"github.com/ihleven/ihlvn/cli"
 	"github.com/ihleven/ihlvn/pkg/blob"
 	"github.com/ihleven/ihlvn/pkg/cmd"
 	"github.com/ihleven/ihlvn/pkg/mail"
@@ -33,8 +35,8 @@ import (
 	"github.com/alexflint/go-arg"
 	"github.com/ihleven/ihlvn/app/art"
 	"github.com/ihleven/ihlvn/app/familie"
-	"github.com/ihleven/ihlvn/pkg/api"
 	"github.com/ihleven/ihlvn/pkg/hi"
+	"github.com/ihleven/ihlvn/pkg/srvr"
 	"github.com/interhome-group/cms/pkg/errs"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -112,8 +114,8 @@ type RootCmd struct {
 	// *ServerCmd `arg:"subcommand:server"`
 	*importart.ImportCmd `arg:"subcommand:import"`
 	*mail.MailCmd        `arg:"subcommand:mail"`
-	*AccountCmd          `arg:"subcommand:account"`
-	*HiTokenCmd          `arg:"subcommand:hitoken"`
+	*cli.AccountCmd      `arg:"subcommand:account"`
+	*cli.HiTokenCmd      `arg:"subcommand:hitoken"`
 
 	// root cmd flags
 	Port  int  `arg:"-p,--port,env:PORT" default:"8000"   help:"Port numbe"` // default:"10815"
@@ -172,15 +174,23 @@ func main() {
 		}
 	case *mail.MailCmd:
 		err = subcmd.Run()
-	case *AccountCmd:
-		err = subcmd.Run(flags)
-	case *HiTokenCmd:
-		err = subcmd.Run(flags)
+	case *cli.AccountCmd:
+		err = subcmd.Run(cli.Accounts{
+			DbConn:            flags.DbConn,
+			MinPasswordLength: flags.MinPasswordLength,
+		})
+	case *cli.HiTokenCmd:
+		err = subcmd.Run(cli.Tokens{
+			DbConn:       flags.DbConn,
+			ClientID:     flags.HidriveClientID,
+			ClientSecret: flags.HidriveClientSecret,
+			PublicURL:    flags.PublicURL,
+		})
 	default:
 		// Only the server owns the pidfile. Claiming it for a subcommand would
 		// make every command refuse to run while the server is up, since it
 		// would find the server's own pid there and take it for a duplicate.
-		handle_pidfile(flags.Pidfile)
+		claimPidfile(flags.Pidfile)
 		err = root.RunServer(flags)
 	}
 
@@ -205,19 +215,85 @@ func withMngrOptions(flags Flags) func(*mgmt.Config) {
 	}
 }
 
-func (cmd *RootCmd) RunServer(flags Flags) error {
+// deps is everything the routes are declared against.
+//
+// A struct rather than a long parameter list because routes() is the whole of
+// what reads it, and what routes() may reach is exactly what belongs in here —
+// so adding a field is a decision rather than a habit.
+type deps struct {
+	flags Flags
+	site  *site
+
+	authsvc *auth.Service
+	admin   *auth.AdminAPI
+	cms     *mgmt.Mngr
+
+	hitokens     hidrive.AccessTokens
+	hidriveOAuth *hidrive.OAuth
+	drives       *hidrive.API
+	filmstore    blob.Blobstore
+	filmthumbs   films.Thumbnailer
+
+	// The familie and art APIs are named by what the routes ask of them, because
+	// both constructors return an unexported type — this is the shape that
+	// crosses the package boundary, and writing it down is what lets deps hold
+	// them at all.
+	fapi familieAPI
+	aapi artAPI
+
+	ghtAPI   handler
+	ghtMedia handler
+
+	godocs *godoc.Handler
+
+	// The CMS's API as a handler, and the mux it was registered on. The mux is
+	// kept because it is the only record of what the CMS mounted there — those
+	// routes are declared by its code, not by the table below.
+	contentAPI http.Handler
+	contentMux *srvr.RecordingMux
+}
+
+// handler is the signature this app's routes are written in: an error comes
+// back rather than being written, so the router's middleware renders it.
+type handler = func(http.ResponseWriter, *http.Request) error
+
+type familieAPI interface {
+	PersonHandler(http.ResponseWriter, *http.Request) error
+	ReiseHandler(http.ResponseWriter, *http.Request) error
+}
+
+type artAPI interface {
+	ArtworkHandler(http.ResponseWriter, *http.Request) error
+	MappingHandler(http.ResponseWriter, *http.Request) error
+	Search(http.ResponseWriter, *http.Request) error
+}
+
+// build brings up everything the server needs, and hands back the way to put it
+// down again.
+//
+// Separated from declaring the routes because they are different jobs and only
+// one of them needs a database: what routes() produces can be inspected by a
+// test, which is how the whole URL space can be checked for the collisions that
+// Go's router only reports by panicking as the server starts.
+//
+// Failures are returned rather than fatal. This used to call log.Fatal six
+// times, which is fine for a function only ever called from a running binary
+// and useless for one a test calls.
+func build(flags Flags) (*deps, func(), error) {
 
 	pg, err := db.New(flags.DbConn)
 	if err != nil {
-		log.Fatal("db.New:", err)
+		return nil, nil, fmt.Errorf("connecting to the database: %w", err)
 	}
-	defer pg.Close()
+	// Given back rather than deferred here: what this function opens outlives
+	// it, and the caller is what knows when serving has stopped.
+	done := func() { pg.Close() }
 
 	// Everything host-dependent comes from here, so a bad value fails at startup
 	// rather than surfacing later as a ceremony that will not complete.
 	site, err := newSite(flags)
 	if err != nil {
-		log.Fatal(err)
+		return nil, done, err
 	}
 
 	hidriveTokens := hidrive.NewStore(pg.Pool())
@@ -245,13 +321,13 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 
 	authsvc, err := openAuth(context.Background(), pg, site, flags)
 	if err != nil {
-		log.Fatal("openAuth: ", err)
+		return nil, done, fmt.Errorf("bringing up authentication: %w", err)
 	}
 	go authsvc.StartCleanup(context.Background(), time.Hour)
 
 	cms, err := mgmt.NewContentManager(flags.RepoContent, withMngrOptions(flags))
 	if err != nil {
-		log.Fatal(err)
+		return nil, done, fmt.Errorf("opening the content repository: %w", err)
 	}
 
 	// The CMS's own reader rather than its repository: what used to be a field
@@ -266,7 +342,7 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	// Whoever is signed in here is who the pool is told about. The token is
 	// minted per forwarded request and never given to the browser, so there is
 	// one credential in play and one place it can be revoked.
-	ghtID := poolIdentity{svc: authsvc}
+	ghtID := gate.PoolIdentity{Svc: authsvc}
 	ghtMinter := geheimtipp.NewMinter(flags.GeheimtippSecret)
 	if ghtMinter == nil {
 		slog.Warn("geheimtipp: no signing secret, the pool will be proxied anonymously")
@@ -274,11 +350,11 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 
 	ghtAPI, err := geheimtipp.Proxy(flags.GeheimtippAPI, "/ght", ghtID, ghtMinter)
 	if err != nil {
-		log.Fatal(err)
+		return nil, done, fmt.Errorf("proxying the pool: %w", err)
 	}
 	ghtMedia, err := geheimtipp.Proxy(flags.GeheimtippMedia, "/ght/media", ghtID, ghtMinter)
 	if err != nil {
-		log.Fatal(err)
+		return nil, done, fmt.Errorf("proxying the pool's media: %w", err)
 	}
 
 	// The enrollment link's lifetime matches the CLI's default: long enough to
@@ -290,20 +366,51 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 	// here rather than on the CMS this renderer came from.
 	godocs := godoc.New(appSource, ".", "github.com/ihleven/ihlvn", "/godoc")
 
-	var route = api.WithRoute
+	contentHandler, contentMux := contentAPI(cms, authsvc, cmd.Version())
 
-	srvr := api.New(
+	return &deps{
+		flags: flags, site: site,
+		contentAPI: contentHandler, contentMux: contentMux,
+		authsvc: authsvc, admin: admin, cms: cms,
+		hitokens: hitokens, hidriveOAuth: hidriveOAuth, drives: drives,
+		filmstore: filmstore, filmthumbs: filmthumbs,
+		fapi: fapi, aapi: aapi,
+		ghtAPI: ghtAPI, ghtMedia: ghtMedia,
+		godocs: godocs,
+	}, done, nil
+}
+
+// routes is the whole of this application's URL space.
+//
+// Given the dependencies and nothing else, so it can be called without a
+// database behind it — which is what lets a test register every pattern and
+// find out whether they can coexist, rather than finding out when the server
+// refuses to start.
+func routes(d *deps) []func(*srvr.Api) {
+	var route = srvr.WithRoute
+
+	// Named locally so the list below is the list that was here before, word for
+	// word. A route declaration should read as an address and a handler, not as
+	// an address and a field access.
+	flags := d.flags
+	authsvc, admin, cms := d.authsvc, d.admin, d.cms
+	hitokens, hidriveOAuth, drives := d.hitokens, d.hidriveOAuth, d.drives
+	filmstore, filmthumbs := d.filmstore, d.filmthumbs
+	fapi, aapi := d.fapi, d.aapi
+	ghtAPI, ghtMedia, godocs := d.ghtAPI, d.ghtMedia, d.godocs
+
+	return []func(*srvr.Api){
 
 		// The CMS's API, mounted whole rather than re-implemented. See contentapi.go.
-		api.Handler(contentAPIPrefix, contentAPI(cms, authsvc, cmd.Version())),
+		srvr.Handler(contentAPIPrefix, d.contentAPI),
 
-		api.Handler("/", spa.Serve(flags.SPAPath)),
+		srvr.Handler("/", spa.Serve(flags.SPAPath)),
 
 		// route(" POST /tokenauth                ", tokenauth), // soll token liefern für spezielle Funktionalität
 		// Binding a HiDrive account is an operator action, not something a
 		// visitor can start.
-		route("      /apihle/auth/authorize    ", requireAccount(authsvc, hidriveOAuth.Authorize)),
-		route("      "+oauthCallbackPath+"     ", requireAccount(authsvc, hidriveOAuth.Callback)),
+		route("      /apihle/auth/authorize    ", gate.Account(authsvc, hidriveOAuth.Authorize)),
+		route("      "+oauthCallbackPath+"     ", gate.Account(authsvc, hidriveOAuth.Callback)),
 
 		route("      /auth/login         ", authsvc.Login),
 		route("      /auth/logout        ", authsvc.Logout),
@@ -340,21 +447,21 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		//
 		// Order matters. The package route matches anything, so it goes last, or
 		// it would swallow the source route.
-		route("  GET /api/v1/godoc                ", requireAccount(authsvc, godocs.Index)),
-		route("  GET /api/v1/godoc/src/{file...}  ", requireAccount(authsvc, godocs.Source)),
-		route("  GET /api/v1/godoc/{pkg...}       ", requireAccount(authsvc, godocs.Package)),
+		route("  GET /api/v1/godoc                ", gate.Account(authsvc, godocs.Index)),
+		route("  GET /api/v1/godoc/src/{file...}  ", gate.Account(authsvc, godocs.Source)),
+		route("  GET /api/v1/godoc/{pkg...}       ", gate.Account(authsvc, godocs.Package)),
 
 		// higrp.GET("/tags/*path", hi.TagsHandler)
 		route("  GET /media/videos/{path...}   ", serveContentWithPrefix("videos")), // used for serving local video on opalstack
 
 		// Reading content is open: the public site is rendered from it. Where an
 		// account is present it is attached, so the entry's own ACL can decide.
-		route("  GET /api/v1/entries/{path...} ", optionalAccount(authsvc, cmsapi.EntryDetails(cms))),
+		route("  GET /api/v1/entries/{path...} ", gate.OptionalAccount(authsvc, cmsapi.EntryDetails(cms))),
 		// Writing content requires an account. The entry ACL cannot stand in for
 		// this: every entry is mode-zero, and a zero mode allows everyone.
-		route("  PUT /api/v1/entries/{path...} ", requireAccount(authsvc, cmsapi.EntryUpdate(cms))),
+		route("  PUT /api/v1/entries/{path...} ", gate.Account(authsvc, cmsapi.EntryUpdate(cms))),
 
-		route("  GET /api/v1/entry             ", optionalAccount(authsvc, cmsapi.EntryLookup(cms))), // lookup single entry with search params
+		route("  GET /api/v1/entry             ", gate.OptionalAccount(authsvc, cmsapi.EntryLookup(cms))), // lookup single entry with search params
 		// route("  GET /api/v1/entries           ", cmsuc.EntriesLookup(cmsapi.CMS)), // lookup entries with search params
 
 		// Two ways to reach a file, distinguished by how it is addressed.
@@ -363,21 +470,21 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		// the entry — so nothing about where the bytes live reaches the
 		// browser, and the film is one resource with sub-resources. The id is a
 		// single segment, which is what lets "/poster.jpg" hang off it.
-		route("  GET  /api/v1/films/{id}", requireAccount(authsvc, films.Handler(cms, filmstore, slog.Default()))),
-		route("  GET  /api/v1/films/{id}/poster.jpg", requireAccount(authsvc, films.Poster(cms, filmthumbs))),
-		route("  GET  /api/v1/films/{id}/chapters.vtt", requireAccount(authsvc, films.ChapterTrack(cms))),
+		route("  GET  /api/v1/films/{id}", gate.Account(authsvc, films.Handler(cms, filmstore, slog.Default()))),
+		route("  GET  /api/v1/films/{id}/poster.jpg", gate.Account(authsvc, films.Poster(cms, filmthumbs))),
+		route("  GET  /api/v1/films/{id}/chapters.vtt", gate.Account(authsvc, films.ChapterTrack(cms))),
 
 		// The file browser. Gated on the entitlement rather than on merely being
 		// signed in, because the entitlement is what decides that someone may
 		// browse at all — see app/drive.
-		route("  GET  /api/v1/drive/meta/{path...}  ", requireHidrive(authsvc, drives.Meta)),
-		route("  GET  /api/v1/drive/media/{path...} ", requireHidrive(authsvc, drives.Media)),
-		route("  GET  /api/v1/drive/thumb           ", requireHidrive(authsvc, drives.Thumbnail)),
+		route("  GET  /api/v1/drive/meta/{path...}  ", gate.Hidrive(authsvc, drives.Meta)),
+		route("  GET  /api/v1/drive/media/{path...} ", gate.Hidrive(authsvc, drives.Media)),
+		route("  GET  /api/v1/drive/thumb           ", gate.Hidrive(authsvc, drives.Thumbnail)),
 		// Same drive, different delivery: stream reads the bytes here instead of
 		// handing out a pre-signed URL, which costs a round-trip less per request
 		// and keeps the store credential on this side. Worth it for anything
 		// seeked through; media stays for fetching a file once.
-		route("  GET  /api/v1/drive/stream/{path...}", requireHidrive(authsvc, drives.Stream)),
+		route("  GET  /api/v1/drive/stream/{path...}", gate.Hidrive(authsvc, drives.Stream)),
 
 		// The shelves: the mediathek, the magazines, the music and the DJ sets.
 		// Declared as a list in shelves.go, where the root each is confined to
@@ -392,7 +499,7 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		route("  GET  /api/v1/artworks/{id}", aapi.ArtworkHandler),
 		route("  GET  /api/v1/art/search", aapi.Search),
 		route("  GET  /api/v1/art/search/mapping", aapi.MappingHandler),
-		route("  GET  /api/v1/search", optionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
+		route("  GET  /api/v1/search", gate.OptionalAccount(authsvc, cmsapi.SearchHandler(cms.Engine))),
 
 		// The geheimtipp pool's own backend, under this origin so a browser may
 		// reach it. Not gated on an account here: the pool has its own sign-in
@@ -408,70 +515,74 @@ func (cmd *RootCmd) RunServer(flags Flags) error {
 		// entitlement rather than on being signed in: these endpoints can grant
 		// rights and set passwords, so hiding the section in the navigation —
 		// which is presentation — is not the protection.
-		route("     GET /api/v1/admin/modules                       ", requireAdmin(authsvc, admin.Areas)),
-		route("     GET /api/v1/admin/accounts                      ", requireAdmin(authsvc, admin.List)),
-		route("    POST /api/v1/admin/accounts                      ", requireAdmin(authsvc, admin.Create)),
-		route("     GET /api/v1/admin/accounts/{name}               ", requireAdmin(authsvc, admin.Get)),
-		route("     PUT /api/v1/admin/accounts/{name}               ", requireAdmin(authsvc, admin.Update)),
-		route("    POST /api/v1/admin/accounts/{name}/password      ", requireAdmin(authsvc, admin.SetPassword)),
-		route("    POST /api/v1/admin/accounts/{name}/enroll        ", requireAdmin(authsvc, admin.IssueEnrollment)),
-		route("     GET /api/v1/admin/accounts/{name}/passkeys      ", requireAdmin(authsvc, admin.Passkeys)),
-		route("  DELETE /api/v1/admin/accounts/{name}/passkeys/{id} ", requireAdmin(authsvc, admin.DeletePasskey)),
-		route("  DELETE /api/v1/admin/accounts/{name}/passkeys      ", requireAdmin(authsvc, admin.Revoke)),
-		route("  DELETE /api/v1/admin/accounts/{name}/sessions      ", requireAdmin(authsvc, admin.DeleteSessions)),
-	)
-
-	log.Printf("serving %s on port %d", site.Origin, cmd.Port)
-
-	return srvr.ListenAndServe(cmd.Port, flags.CorsOrigins, flags.Debug)
+		route("     GET /api/v1/admin/modules                       ", gate.Admin(authsvc, admin.Areas)),
+		route("     GET /api/v1/admin/accounts                      ", gate.Admin(authsvc, admin.List)),
+		route("    POST /api/v1/admin/accounts                      ", gate.Admin(authsvc, admin.Create)),
+		route("     GET /api/v1/admin/accounts/{name}               ", gate.Admin(authsvc, admin.Get)),
+		route("     PUT /api/v1/admin/accounts/{name}               ", gate.Admin(authsvc, admin.Update)),
+		route("    POST /api/v1/admin/accounts/{name}/password      ", gate.Admin(authsvc, admin.SetPassword)),
+		route("    POST /api/v1/admin/accounts/{name}/enroll        ", gate.Admin(authsvc, admin.IssueEnrollment)),
+		route("     GET /api/v1/admin/accounts/{name}/passkeys      ", gate.Admin(authsvc, admin.Passkeys)),
+		route("  DELETE /api/v1/admin/accounts/{name}/passkeys/{id} ", gate.Admin(authsvc, admin.DeletePasskey)),
+		route("  DELETE /api/v1/admin/accounts/{name}/passkeys      ", gate.Admin(authsvc, admin.Revoke)),
+		route("  DELETE /api/v1/admin/accounts/{name}/sessions      ", gate.Admin(authsvc, admin.DeleteSessions)),
+	}
 }
 
-// func RequestToken(id, secret, code string) (*hi.Token, error) {
-// 	fmt.Println("id, secret, code:", id, secret, code)
+func (cmd *RootCmd) RunServer(flags Flags) error {
+	d, done, err := build(flags)
+	if done != nil {
+		defer done()
+	}
+	if err != nil {
+		return err
+	}
 
-// 	params := url.Values{
-// 		"client_id":     []string{id},
-// 		"client_secret": []string{secret},
-// 		"grant_type":    []string{"authorization_code"},
-// 		"code":          []string{code},
-// 	}
+	log.Printf("serving %s on port %d", d.site.Origin, cmd.Port)
 
-// 	request, err := http.NewRequest("POST", "https://my.hidrive.com/oauth2/token?"+params.Encode(), nil)
-// 	if err != nil {
-// 		return nil, hi.Error{HTTPStatus: 500, Message: "Couldn't create request: " + err.Error()}
-// 	}
+	return srvr.New(routes(d)...).ListenAndServe(cmd.Port, flags.CorsOrigins, flags.Debug)
+}
 
-// 	resp, err := http.DefaultClient.Do(request)
-// 	if err != nil {
-// 		if os.IsTimeout(err) {
-// 			// HTTP 504 Gateway Timeout
-// 			return nil, hi.Error{HTTPStatus: 504, Message: "timeout exceeded: " + err.Error()}
-// 		}
+// openAuth brings up the authentication service against the account database.
+//
+// Migrations run here rather than as a separate deployment step, so the binary
+// and the schema it expects cannot get out of step.
+func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags) (*auth.Service, error) {
+	if err := db.Migrate(ctx, pg.Pool()); err != nil {
+		return nil, fmt.Errorf("migrating the account database: %w", err)
+	}
 
-// 		// HTTP 502 Bad Gateway
-// 		return nil, hi.Error{HTTPStatus: 502, Message: "HTTP client couldn't Do request: " + err.Error()}
-// 	}
+	return auth.NewService(auth.NewStore(pg.Pool()), auth.Config{
+		CookieName:    flags.CookieName,
+		CookieSecure:  site.CookieSecure,
+		SameSite:      flags.CookieSameSite,
+		SessionTTL:    time.Duration(flags.JWTDuration) * time.Second,
+		Issuer:        flags.JWTIssuer,
+		Audience:      "famihlie",
+		FailureLimit:  10,
+		FailureWindow: 15 * time.Minute,
 
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		fmt.Println("read err:", err)
-// 		return nil, hi.Error{Message: "read error: " + err.Error()}
-// 	}
+		// Whether an account with no drive of its own still has something to
+		// browse, which is what decides if the file browser is offered at all.
+		SharedDrive: flags.MediaAlias != "",
 
-// 	fmt.Println(string(body))
-// 	var t hi.Token
-// 	err = json.Unmarshal(body, &t)
-// 	if err != nil {
-// 		fmt.Println("err:", err)
-// 		return nil, hi.Error{Message: err.Error()}
-// 	}
-// 	fmt.Println("token:", t)
-// 	return &t, nil
-// }
+		// Whether a pool player with no account here can sign in with their
+		// pool password, which creates one.
+		AdoptGeheimtipp: flags.GeheimtippAdopt,
 
-/////////////// code aus altem main mit bunrouter ////////////////
+		// The same screening policy the administrator's path uses, so a
+		// password someone picks for themselves is held to one standard.
+		MinPasswordLength: flags.MinPasswordLength,
 
-// videos aus lokalen unterverzeichnis videos
+		RPID:      site.RPID,
+		RPOrigins: site.PasskeyOrigins,
+		// RPDisplayName is left to the passkey package, which falls back to the relying party
+		// id — so the name a browser shows follows the domain automatically.
+	}, slog.Default())
+}
+
+// serveContentWithPrefix serves files from a local directory — the videos kept
+// beside the binary rather than on the media drive.
 func serveContentWithPrefix(prefix string) func(http.ResponseWriter, *http.Request) error {
 
 	return func(w http.ResponseWriter, r *http.Request) error {
@@ -503,20 +614,9 @@ func serveContentWithPrefix(prefix string) func(http.ResponseWriter, *http.Reque
 	}
 }
 
-func testNewHiFS(accesstoken string) {
-
-	fs := hi.NewFS(accesstoken)
-	f, err := fs.Open("/public/blog/README.md")
-	fmt.Println("file", f, err)
-	stat, err := f.Stat()
-	fmt.Println("stat", stat.Size(), err)
-	var bytes []byte
-	n, err := f.Read(bytes)
-	fmt.Printf("%d: %s %s", n, bytes, err)
-
-}
-
-func handle_pidfile(filename string) {
+// claimPidfile takes the pidfile for this process and gives it up on the way
+// out, so a stale file does not outlive the server that wrote it.
+func claimPidfile(filename string) {
 	if filename == "" {
 		return
 	}

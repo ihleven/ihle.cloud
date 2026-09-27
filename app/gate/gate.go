@@ -1,68 +1,36 @@
-package main
+// Package gate decides whether a request may proceed.
+//
+// One question, asked in three widths: is anybody signed in, does that somebody
+// hold a right, and — for the endpoints that are somebody else's code — who is
+// asking, expressed in that code's own vocabulary.
+//
+// Separate from app/auth, which proves who a person is. This package takes that
+// as settled and asks what they may do, which is why it needs no more of the
+// auth service than the Authenticator interface below: everything here can be
+// exercised against a stub, and the thing worth testing — whether a right
+// admits a request — is not tied to reading a cookie.
+package gate
 
 import (
-	"context"
-	"fmt"
-	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/ihleven/ihlvn/app/auth"
 	"github.com/ihleven/ihlvn/app/cmsauth"
-	"github.com/ihleven/ihlvn/app/db"
 	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/pkg/errs"
 )
 
-// openAuth brings up the authentication service against the account database.
-//
-// Migrations run here rather than as a separate deployment step, so the binary
-// and the schema it expects cannot get out of step.
-func openAuth(ctx context.Context, pg *db.DB, site *site, flags Flags) (*auth.Service, error) {
-	if err := db.Migrate(ctx, pg.Pool()); err != nil {
-		return nil, fmt.Errorf("migrating the account database: %w", err)
-	}
-
-	return auth.NewService(auth.NewStore(pg.Pool()), auth.Config{
-		CookieName:    flags.CookieName,
-		CookieSecure:  site.CookieSecure,
-		SameSite:      flags.CookieSameSite,
-		SessionTTL:    time.Duration(flags.JWTDuration) * time.Second,
-		Issuer:        flags.JWTIssuer,
-		Audience:      "famihlie",
-		FailureLimit:  10,
-		FailureWindow: 15 * time.Minute,
-
-		// Whether an account with no drive of its own still has something to
-		// browse, which is what decides if the file browser is offered at all.
-		SharedDrive: flags.MediaAlias != "",
-
-		// Whether a pool player with no account here can sign in with their
-		// pool password, which creates one.
-		AdoptGeheimtipp: flags.GeheimtippAdopt,
-
-		// The same screening policy the administrator's path uses, so a
-		// password someone picks for themselves is held to one standard.
-		MinPasswordLength: flags.MinPasswordLength,
-
-		RPID:      site.RPID,
-		RPOrigins: site.PasskeyOrigins,
-		// RPDisplayName is left to the passkey package, which falls back to the relying party
-		// id — so the name a browser shows follows the domain automatically.
-	}, slog.Default())
-}
-
-// authenticator is the whole of what these wrappers need from the auth service:
+// Authenticator is the whole of what these wrappers need from the auth service:
 // given a request, who is making it.
 //
 // Narrowed to an interface so the gate below can be exercised on its own. What
 // it decides — whether an entitlement admits a request — is worth a test, and
 // tying that to a live session store would mean testing cookie parsing instead.
-type authenticator interface {
+type Authenticator interface {
 	Authenticate(*http.Request) (*auth.Account, bool)
 }
 
-// requireAccount refuses a request without an account and hands the account to
+// Account refuses a request without an account and hands the account to
 // the handler in its context.
 //
 // It reports the refusal as an error rather than writing the response itself, so
@@ -76,7 +44,7 @@ type authenticator interface {
 // deliberately, instead of open until someone remembers to close it. Nothing
 // needs opening today — the pool's own routes and the sign-in endpoints are
 // bare handlers that never reach this.
-func requireAccount(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+func Account(svc Authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		account, ok := svc.Authenticate(r)
 		if !ok {
@@ -89,16 +57,16 @@ func requireAccount(svc authenticator, h func(http.ResponseWriter, *http.Request
 	}
 }
 
-// poolIdentity answers the geheimtipp proxy's one question: who is making this
+// PoolIdentity answers the geheimtipp proxy's one question: who is making this
 // request, and may they act as themselves on the pool?
 //
 // It lives here rather than in the geheimtipp package because it is the join
 // between the two — what an account is, and what the pool needs to be told —
-// and that join belongs where the wiring is.
-type poolIdentity struct{ svc authenticator }
+// and because deciding it is this package's business.
+type PoolIdentity struct{ Svc Authenticator }
 
-func (p poolIdentity) PoolLogin(r *http.Request) (string, bool) {
-	account, ok := p.svc.Authenticate(r)
+func (p PoolIdentity) PoolLogin(r *http.Request) (string, bool) {
+	account, ok := p.Svc.Authenticate(r)
 	if !ok {
 		return "", false
 	}
@@ -112,9 +80,9 @@ func (p poolIdentity) PoolLogin(r *http.Request) (string, bool) {
 	return "", false
 }
 
-// optionalAccount attaches the account when there is one. Public routes use it
+// OptionalAccount attaches the account when there is one. Public routes use it
 // so an anonymous reader is served and a signed-in one is identified.
-func optionalAccount(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+func OptionalAccount(svc Authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		if account, ok := svc.Authenticate(r); ok {
 			r = r.WithContext(auth.WithAccount(r.Context(), account))
@@ -123,8 +91,8 @@ func optionalAccount(svc authenticator, h func(http.ResponseWriter, *http.Reques
 	}
 }
 
-// requirePermission refuses a request whose account does not hold a right, and
-// hands the account to the handler as requireAccount does.
+// Permission refuses a request whose account does not hold a right, and
+// hands the account to the handler as Account does.
 //
 // The right is checked here rather than trusted from the client: the navigation
 // hides what an account may not use, but that is presentation. Composed from
@@ -136,8 +104,8 @@ func optionalAccount(svc authenticator, h func(http.ResponseWriter, *http.Reques
 // Which kind it is matters to a reader, which is what requireModule below is
 // for: the name at the call site says whether an area or a capability is being
 // demanded, and those are answers to different questions.
-func requirePermission(svc authenticator, key content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requireAccount(svc, func(w http.ResponseWriter, r *http.Request) error {
+func Permission(svc Authenticator, key content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return Account(svc, func(w http.ResponseWriter, r *http.Request) error {
 		account, ok := auth.FromContext(r.Context())
 		if !ok || !cmsauth.May(account, key) {
 			return errs.New("%s", refusal, errs.HTTPStatus(http.StatusForbidden))
@@ -146,29 +114,29 @@ func requirePermission(svc authenticator, key content.PermissionKey, refusal str
 	})
 }
 
-// requireModule refuses a request whose account is not entitled to an area.
+// Module refuses a request whose account is not entitled to an area.
 //
-// The same check as requirePermission and a different statement: this one says
+// The same check as Permission and a different statement: this one says
 // the thing being demanded is a *place in this app* that a visitor may or may
 // not be shown, rather than something they may or may not do. Most areas never
 // reach here — they are offered in a menu and nothing more — and this is for
 // the ones where being in the area is itself the access decision.
-func requireModule(svc authenticator, area content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requirePermission(svc, area, refusal, h)
+func Module(svc Authenticator, area content.PermissionKey, refusal string, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return Permission(svc, area, refusal, h)
 }
 
-// requireAdmin gates account administration, which can rename an account, grant
+// Admin gates account administration, which can rename an account, grant
 // it rights or set its password.
-func requireAdmin(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requireModule(svc, cmsauth.Admin, "administration requires the admin entitlement", h)
+func Admin(svc Authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return Module(svc, cmsauth.Admin, "administration requires the admin entitlement", h)
 }
 
-// requireHidrive gates browsing the family's storage.
-func requireHidrive(svc authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
-	return requireModule(svc, cmsauth.Hidrive, "browsing the files requires the hidrive entitlement", h)
+// Hidrive gates browsing the family's storage.
+func Hidrive(svc Authenticator, h func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
+	return Module(svc, cmsauth.Hidrive, "browsing the files requires the hidrive entitlement", h)
 }
 
-// cmsIdentity hands the CMS's own controllers an identity they can read.
+// CMSIdentity hands the CMS's own controllers an identity they can read.
 //
 // They are transport-free and ask for the signed-in person through
 // content.RequireUser, which reads one key; this app's middleware writes its own
@@ -176,11 +144,11 @@ func requireHidrive(svc authenticator, h func(http.ResponseWriter, *http.Request
 // joined somewhere, and this is the join: authenticate once, and say who it is
 // in both vocabularies.
 //
-// Optional rather than required, like optionalAccount: reading content is open
+// Optional rather than required, like OptionalAccount: reading content is open
 // in this app — the public site is rendered from it — and every entry carries an
 // ACL that decides for itself. What needs an account refuses for itself too: the
 // controllers answer 401 when there is nobody to name.
-func cmsIdentity(svc authenticator, next http.Handler) http.Handler {
+func CMSIdentity(svc Authenticator, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if account, ok := svc.Authenticate(r); ok {
 			ctx := auth.WithAccount(r.Context(), account)
