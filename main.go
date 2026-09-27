@@ -24,8 +24,8 @@ import (
 	"github.com/ihleven/ihlvn/pkg/blob"
 	"github.com/ihleven/ihlvn/pkg/cmd"
 	"github.com/ihleven/ihlvn/pkg/mail"
+	"github.com/ihleven/ihlvn/pkg/pidfile"
 	"github.com/ihleven/ihlvn/pkg/spa"
-	"github.com/moby/moby/pkg/pidfile"
 
 	"github.com/interhome-group/cms/content"
 	"github.com/interhome-group/cms/mgmt"

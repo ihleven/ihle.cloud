@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/interhome-group/cms/pkg/errs"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pkg/errors"
-	// _ "github.com/lib/pq" // PostgreSQL driver
 )
 
 func New(dbpool *pgxpool.Pool) *kunstDB {
@@ -31,10 +30,10 @@ func (r *kunstDB) Select(dst interface{}, query string, args ...interface{}) err
 
 	err := pgxscan.Select(r.ctx, r.pool, dst, query, args...)
 	if err != nil {
-		// if errors.As(err, &pgx.ErrNoRows) {
-		// 	return errors.NewWithCode(errors.NotFound, "Not found: %s", query)
-		// }
-		return errors.Wrap(err, "Error")
+		// The query is deliberately not in the message: these errors are
+		// rendered to callers, and a statement says more about the schema than
+		// a caller has any business knowing.
+		return errs.Wrap(err, "querying the database")
 	}
 	return nil
 }
