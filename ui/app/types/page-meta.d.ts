@@ -1,49 +1,63 @@
-// A page may declare itself reachable without a session. app.vue gates the whole
-// app on one, so a page that is meant to be opened by someone not signed in —
-// an enrollment link, a public film — has to say so.
-// A page may also drop parts of the shell its layout would otherwise give it.
-// The layout decides which parts exist at all; this turns off ones it supports.
-// A layout without a footer simply ignores `footer: false`.
+// A page may declare that this app does not guard it. app.vue gates everything
+// on a session, so a page reached without one — an enrolment link, the pool,
+// which has an account system of its own — has to say so.
+//
+// Not "public": the pool is not open to the world, every page of it sends you
+// to its own login, and that word was read here once as meaning it was and
+// written into a plan as fact.
+// A page may also say what the shell should look like where it is. Whether a
+// part exists at all is the layout's: a layout without a footer simply ignores
+// `footer: false`, and a layout that draws no header cannot be given one here.
 //
 // definePageMeta is a compile-time macro, so these have to be written out
 // literally — they cannot depend on the session. Anything conditional on who is
 // signed in belongs in the layout, as geheimtipp's footer does.
 interface ShellParts {
   /**
-   * The strip along the top: the wordmark and, from lg, the areas.
+   * The top of the screen: the colour of it, and what can be read against it.
    *
-   * It scrolls away with the page by default, because iOS hazes the top of
-   * scrolling content and nothing a page can write prevents it — so anything
-   * anchored there is permanently under it. A page that would rather keep the
-   * strip in reach than avoid that band says `'fixed'`, and it then stays put
-   * while the page scrolls. `'static'` is the default spelled out.
+   * The header below lg is a fixed strip, and on an installed iPhone it is the
+   * status bar — iOS takes the bar's colour from the pixels the page paints
+   * there. It samples the strip where the page has been scrolled and the
+   * document behind the page where it has not, so both are painted from this
+   * one value and a page cannot set them apart.
    *
-   * The round menu button shares that band and follows this unless `menu` says
-   * otherwise: the two leaving at different moments is what made one band look
-   * like two decisions.
+   * The ink is stated rather than worked out, so that choosing a colour means
+   * looking at what has to be read against it. iOS picks its own indicators
+   * from the same surface and will not be told, which is why a mid-tone is a
+   * poor choice here whatever is written.
+   *
+   * Any CSS colour, the palette included: `var(--color-blue-800)`.
    */
-  bar?: boolean | 'fixed' | 'static'
-  footer?: boolean
+  top?: {
+    colour: string
+    ink: 'light' | 'dark'
+    /**
+     * Whether the header leaves with the page instead of staying at the top.
+     *
+     * For a page that is one picture and a list under it — a film, an episode:
+     * the picture sticks to the top of the window and what is up there is the
+     * picture rather than a bar over it. The way back and the menu are a scroll
+     * away, which on such a page is the trade worth making.
+     *
+     * A page that asks for this should stick its own picture at
+     * `top-(--status-bar)` rather than at `top-(--top-height)`: the row is
+     * gone, but the band under the system's own clock and battery stays, and
+     * a picture that rose past it would leave the page showing through.
+     */
+    scrolls?: boolean
+  }
   /**
-   * The main menu: the round button in the corner and what it opens.
+   * How big the round menu button is: 'sm', 'md' or 'lg'.
    *
-   * This is AppMenu, which the layout renders. The other menu — the slideover of
-   * areas — belongs to the bar along the foot of the screen, which is shown
-   * below lg and carries its own way in.
-   *
-   * Where it sits follows `bar`, because the two share the band at the top: by
-   * default both scroll away with the page, and a page that pins the strip pins
-   * this with it. iOS hazes that band and nothing a page can write prevents it,
-   * which is why leaving is the default.
-   *
-   * `'fixed'` or `'static'` decides for the button alone, for the pages where
-   * the two genuinely differ — the reader has no strip at all and still wants
-   * the way out to leave with the page.
-   *
-   * Only the button moves. What it opens stays fixed over the viewport — an
-   * overlay that scrolled with the page behind it would be no overlay at all.
+   * What it opens does not change. The menu is laid out against the screen and
+   * the circle behind it is measured from whatever the button turns out to be,
+   * so this is a statement about the corner of the page rather than about the
+   * menu — and the header reads it too, because it leaves the button a hole and
+   * stops its rule short of it.
    */
-  menu?: boolean | 'fixed' | 'static'
+  menuSize?: 'sm' | 'md' | 'lg'
+  footer?: boolean
   /**
    * The band between the strip and the page: how tall, as any CSS length.
    *
@@ -53,8 +67,8 @@ interface ShellParts {
    * — where the strip and the first row read as one block of colour and the eye
    * cannot find the join.
    *
-   * `false` or `'0'` removes it. It is drawn only where there is a strip to
-   * fade from, so a page with `bar: false` has no band whatever this says.
+   * `false` or `'0'` removes it. It hangs under the wide rendering of the
+   * header only; below lg there is no band.
    *
    * Any CSS length: '2rem', '5vh', '48px'.
    */
@@ -114,7 +128,7 @@ interface ShellParts {
 
 declare module '#app' {
   interface PageMeta {
-    public?: boolean
+    unguarded?: boolean
     shell?: ShellParts
   }
 }

@@ -1,5 +1,13 @@
 <template>
   <article class="h-full min-h-full w-full">
+    <!-- What the entry is called, in the header. Said here rather than in each
+         of the four views: the name is the entry's, not the view's, and a film,
+         an exhibition, a person and a work would otherwise each have their own
+         idea of where a title comes from. -->
+    <PageTitle>
+      {{ entry?.name }}
+    </PageTitle>
+
     <component
       :is="component"
       v-model:entry="entry"
@@ -10,9 +18,13 @@
 
 <script setup lang="ts">
 definePageMeta({
-  // A content entry is shown full-bleed and carries its own way around, so the
-  // round menu button would sit on top of it.
-  shell: { menu: false },
+  shell: {
+    // A content entry is shown full width — a film, an exhibition, a person, a
+    // work — so the header leaves with the page and the entry has the screen.
+    // It is a scroll away, which is more than these pages had before they were
+    // given one at all.
+    top: { colour: 'black', ink: 'light', scrolls: true },
+  },
   middleware: [
     function () {
       // The audience a session was issued for. Only this app issues one, so a

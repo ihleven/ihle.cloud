@@ -3,7 +3,7 @@
     <!-- The way back, kept on screen. Installed, this is the only one there
          is: no address bar, no back button, no pull to reload. -->
     <header
-      class="sticky top-0 flex items-center gap-2 border-b border-accented bg-default px-2 py-1 text-highlighted"
+      class="sticky top-(--sticky-top) flex items-center gap-2 border-b border-accented bg-default px-2 py-1 text-highlighted"
     >
       <UButton
         to="/retro"
@@ -35,7 +35,7 @@
 // No bar, no footer, and a menu button that goes with the page rather than
 // riding over the magazine: this page is a reader, and everything it does not
 // need is chrome across somebody's reading.
-definePageMeta({ shell: { bar: false, footer: false, menu: 'static', background: 'var(--ui-bg-elevated)' } })
+definePageMeta({ shell: { top: { colour: 'var(--color-blue-800)', ink: 'light' }, footer: false, background: 'var(--ui-bg-elevated)' } })
 
 const route = useRoute()
 

@@ -1,7 +1,7 @@
 <template>
   <article
     v-if="variant==='listitem'"
-    class="border-0 border-accented p-1 grow"
+    class="grow border-0 border-accented p-1"
   >
     <UButton
       class="float-right -m-1"
@@ -39,7 +39,7 @@
     v-else
     class="p-4"
   >
-    <div class="grid grid-cols-12 gap-4 justify-stretch">
+    <div class="grid grid-cols-12 justify-stretch gap-4">
       <UFormField
         label="Titel:"
         class="col-span-9"

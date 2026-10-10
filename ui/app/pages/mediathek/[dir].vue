@@ -11,10 +11,17 @@
     </p>
 
     <template v-else>
-      <!-- The player and the bar that drives it travel together and stay at the
-           top, so that reaching the fortieth episode of a series does not mean
-           scrolling the thing you are watching off the screen. -->
-      <div class="sticky top-0">
+      <!-- The player stays at the top, so that reaching the fortieth episode of
+           a series does not mean scrolling the thing you are watching off the
+           screen. Under the header rather than under the top of the window: the
+           header is fixed on a narrow screen and sticky on a wide one, and
+           either way it is already there.
+
+           What drove the player used to travel with it — a bar carrying the way
+           back, the name of the episode and these two buttons. The way back was
+           the second on the screen and the other two now sit in the header,
+           which is where a page says what it is. -->
+      <div class="sticky top-(--sticky-top)">
         <section class="bg-black">
           <video
             v-if="current"
@@ -32,47 +39,46 @@
           </video>
         </section>
 
-        <nav class="flex items-center gap-2 border-b border-accented bg-default px-2 py-1">
-          <NuxtLink
-            to="/mediathek"
-            class="flex shrink-0 items-center gap-0.5 text-sm text-muted hover:text-highlighted"
-          >
-            <UIcon name="i-lucide-chevron-left" class="size-5" />
-            Mediathek
-          </NuxtLink>
+        <!-- Under the picture, which is where the controls for a picture
+             belong: they were in the header for a while and at that size, in
+             that corner, next to the round button, they were a thing to miss
+             rather than a thing to press. Their room is here.
 
-          <h1 class="grow truncate text-center text-sm font-semibold text-highlighted">
-            {{ series.title }}
-            <span v-if="current" class="font-normal text-muted">· {{ current.title }}</span>
-          </h1>
-
-          <div class="flex shrink-0 items-center gap-1">
-            <!-- Two sizes, and neither is the other's smaller version: the
-                 picture is 406 lines tall, so filling the window enlarges it
-                 past what was recorded. That is a choice about how it looks,
-                 not a way to see more of it, which is why it is offered rather
-                 than simply done. -->
-            <UButton
-              size="xs"
-              variant="ghost"
-              color="neutral"
-              :icon="wide ? 'i-lucide-fold-horizontal' : 'i-lucide-unfold-horizontal'"
-              :aria-label="wide ? 'Originalgröße' : 'Volle Breite'"
-              :title="wide ? 'Originalgröße' : 'Volle Breite'"
-              @click="wide = !wide"
-            />
-            <UButton
-              size="xs"
-              variant="ghost"
-              color="neutral"
-              icon="i-lucide-maximize"
-              aria-label="Vollbild"
-              title="Vollbild"
-              @click="fullscreen()"
-            />
-          </div>
-        </nav>
+             Part of the block that sticks, so they stay with the film. -->
+        <div class="flex items-center justify-end gap-1 bg-black px-1 pb-1">
+          <!-- Two sizes, and neither is the other's smaller version: the
+               picture is 406 lines tall, so filling the window enlarges it past
+               what was recorded. That is a choice about how it looks, not a way
+               to see more of it, which is why it is offered rather than simply
+               done. -->
+          <UButton
+            size="xl"
+            variant="ghost"
+            color="neutral"
+            class="text-white hover:bg-white/10 hover:text-white"
+            :icon="wide ? 'i-lucide-fold-horizontal' : 'i-lucide-unfold-horizontal'"
+            :aria-label="wide ? 'Originalgröße' : 'Volle Breite'"
+            :title="wide ? 'Originalgröße' : 'Volle Breite'"
+            @click="wide = !wide"
+          />
+          <UButton
+            size="xl"
+            variant="ghost"
+            color="neutral"
+            class="text-white hover:bg-white/10 hover:text-white"
+            icon="i-lucide-maximize"
+            aria-label="Vollbild"
+            title="Vollbild"
+            @click="fullscreen()"
+          />
+        </div>
       </div>
+
+      <!-- What this page is, and what it offers, handed to the header. -->
+      <PageTitle>
+        {{ series.title }}
+        <span v-if="current" class="font-normal opacity-70">· {{ current.title }}</span>
+      </PageTitle>
 
       <!-- Side by side where there is room for it. On a phone half a screen is
            too narrow for either, so the cover goes above the list rather than
@@ -133,7 +139,15 @@
 
 // The page paints its own bg-elevated, so the band under the strip has to arrive
 // at that and not at the colour the layout would otherwise use.
-definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+definePageMeta({
+  shell: {
+    // The film takes the top of the screen: the header leaves with the page and
+    // the picture sticks where it was, so what is up there is the episode
+    // rather than a bar over it.
+    top: { colour: 'black', ink: 'light', scrolls: true },
+    background: 'var(--ui-bg-elevated)',
+  },
+})
 
 const route = useRoute()
 const dir = computed(() => String(route.params.dir ?? ''))

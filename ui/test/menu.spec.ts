@@ -15,12 +15,14 @@ function panel(viewportWidth: number, width: number, height: number): Box {
   return { left: viewportWidth - width, top: 0, right: viewportWidth, bottom: height }
 }
 
-/** Does a circle of this radius, centred on the button, hold the panel's far corner? */
+/** Does a circle of this radius, centred on the button, hold every corner? */
 function holds(radius: number, p: Box, b: Box) {
   const x = (b.left + b.right) / 2
   const y = (b.top + b.bottom) / 2
 
-  return Math.hypot(x - p.left, p.bottom - y) <= radius
+  return [p.top, p.bottom].every(
+    v => [p.left, p.right].every(h => Math.hypot(x - h, y - v) <= radius),
+  )
 }
 
 describe('discRadius', () => {
@@ -83,5 +85,15 @@ describe('discRadius', () => {
     const p = panel(390, 390, 477)
 
     expect(discRadius(p, button(390, 59))).toBeLessThan(discRadius(p, button(390, 0)))
+  })
+
+  // Below lg the button is in the bottom corner and the panel stands above it,
+  // so the corner it has to reach is the top left rather than the bottom left.
+  // The old arithmetic took the far corner as read and came up short here.
+  it('reaches the panel when the button is below it', () => {
+    const b = { left: 390 - 16 - 48, top: 900 - 16 - 48, right: 390 - 16, bottom: 900 - 16 }
+    const p = { left: 0, top: 352, right: 390, bottom: 900 }
+
+    expect(holds(discRadius(p, b), p, b)).toBe(true)
   })
 })

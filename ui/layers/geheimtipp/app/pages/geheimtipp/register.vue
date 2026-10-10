@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import type { AvatarFile, EditionTipper } from '../../types'
 
-definePageMeta({ public: true, layout: 'geheimtipp' })
+definePageMeta({ unguarded: true, layout: 'geheimtipp' })
 
 const { login, edition, registration, load: reloadSession } = useGhtSession()
 const { load: reloadEdition } = useGhtEdition()

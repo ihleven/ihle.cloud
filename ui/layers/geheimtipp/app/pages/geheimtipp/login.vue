@@ -14,7 +14,7 @@
 // years, the gate still sends people here, and a bookmark should land somewhere
 // useful rather than on a 404. It forwards, carrying where they were going so
 // the sign-in still ends up there.
-definePageMeta({ public: true, layout: false })
+definePageMeta({ unguarded: true, layout: false })
 
 const route = useRoute()
 

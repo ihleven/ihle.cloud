@@ -126,7 +126,7 @@
 
 // The page paints its own bg-elevated, so the band under the strip has to arrive
 // at that and not at the colour the layout would otherwise use.
-definePageMeta({ shell: { background: 'var(--ui-bg-elevated)' } })
+definePageMeta({ shell: { top: { colour: 'var(--color-blue-800)', ink: 'light' }, background: 'var(--ui-bg-elevated)' } })
 
 const { shelf: load } = useRetro()
 

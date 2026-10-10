@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import type { CompRound } from '../../types'
 
-definePageMeta({ public: true, layout: 'geheimtipp' })
+definePageMeta({ unguarded: true, layout: 'geheimtipp' })
 
 const route = useRoute()
 const saison = route.params.saison as string

@@ -29,11 +29,13 @@
             />
             <div class="grow">
               <UInput
-                :model-value="scene.title" variant="ghost" placeholder="Titel" class="w-full"
+                :model-value="scene.title" variant="ghost" placeholder="Titel"
+                class="w-full"
                 @update:model-value="update(`content.scenes[${i}].title`, $event)"
               />
               <UTextarea
-                :model-value="scene.description" variant="none" placeholder="Beschreibung" class="w-full"
+                :model-value="scene.description" variant="none" placeholder="Beschreibung"
+                class="w-full"
                 autoresize :rows="1"
                 @update:model-value="update(`content.scenes[${i}].description`, $event)"
               />
@@ -70,17 +72,20 @@
             :class="{ 'bg-primary-50 dark:bg-primary-950': isNow(annotation) }"
           >
             <UButton
-              size="xs" variant="ghost" color="neutral" icon="i-lucide-circle-play"
+              size="xs" variant="ghost" color="neutral"
+              icon="i-lucide-circle-play"
               class="shrink-0 cursor-pointer"
               :title="`Zur Position springen (${timecode(annotation.start)})`"
               @click="seek(annotation.start)"
             />
             <USelect
-              :model-value="annotation.kind" :items="kinds" size="xs" class="w-24 shrink-0"
+              :model-value="annotation.kind" :items="kinds" size="xs"
+              class="w-24 shrink-0"
               @update:model-value="update(`content.annotations[${index}].kind`, $event)"
             />
             <UInput
-              :model-value="annotation.label" variant="ghost" placeholder="Name" class="grow"
+              :model-value="annotation.label" variant="ghost" placeholder="Name"
+              class="grow"
               @update:model-value="update(`content.annotations[${index}].label`, $event)"
             />
 
@@ -92,7 +97,8 @@
               @click="seek(annotation.start)"
             />
             <UButton
-              size="xs" variant="ghost" icon="i-lucide-crosshair" title="Anfang hierher"
+              size="xs" variant="ghost" icon="i-lucide-crosshair"
+              title="Anfang hierher"
               @click="update(`content.annotations[${index}].start`, round(now))"
             />
             <span class="text-muted">–</span>
@@ -106,11 +112,13 @@
               @click="seek(endOf(annotation))"
             />
             <UButton
-              size="xs" variant="ghost" icon="i-lucide-crosshair" title="Ende hierher"
+              size="xs" variant="ghost" icon="i-lucide-crosshair"
+              title="Ende hierher"
               @click="update(`content.annotations[${index}].end`, round(now))"
             />
             <UButton
-              v-if="annotation.end" size="xs" color="neutral" variant="ghost" icon="i-lucide-undo-2"
+              v-if="annotation.end" size="xs" color="neutral"
+              variant="ghost" icon="i-lucide-undo-2"
               :title="`Ende zurücksetzen (${defaultDuration} s)`"
               @click="update(`content.annotations[${index}].end`, null)"
             />
@@ -123,7 +131,8 @@
               @click="placing = placing === index ? null : index"
             />
             <UButton
-              v-if="annotation.at" size="xs" color="neutral" variant="ghost" icon="i-lucide-x"
+              v-if="annotation.at" size="xs" color="neutral"
+              variant="ghost" icon="i-lucide-x"
               title="Position entfernen"
               @click="update(`content.annotations[${index}].at`, null)"
             />

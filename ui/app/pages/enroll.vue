@@ -25,8 +25,11 @@
       </form>
 
       <UAlert v-if="error" class="mt-4" color="error" variant="soft" :description="error" />
-      <UAlert v-if="done" class="mt-4" color="success" variant="soft"
-        description="Registered. You can now sign in with this device." />
+      <UAlert
+        v-if="done" class="mt-4" color="success"
+        variant="soft"
+        description="Registered. You can now sign in with this device."
+      />
     </div>
   </article>
 </template>
@@ -36,7 +39,7 @@
 // but has not signed in, and the link carries an enrollment cookie rather than a
 // session. Without this the app's sign-in overlay would cover the page they were
 // sent to.
-definePageMeta({ public: true })
+definePageMeta({ unguarded: true })
 
 // The enrollment link lands on /auth/enroll, which moves the token into a
 // cookie and redirects here — so the token is not in this page's URL, and this

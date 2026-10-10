@@ -440,16 +440,22 @@ func routes(d *deps) []func(*srvr.Api) {
 		// read them, so the gate is ours. Signed in only: the source is not
 		// secret, but it is not the public site either.
 		//
-		// Under the API prefix, not /godoc: the pages at /godoc belong to the
+		// Under an API prefix, not /godoc: the pages at /godoc belong to the
 		// SPA, which fetches these and renders them itself. A handler mounted
 		// there would win against the SPA's catch-all and serve its own HTML
 		// instead of the app.
 		//
+		// The prefix is the CMS's rather than this app's, because the pages that
+		// call these come from the CMS's godoc layer, and that layer asks where
+		// the CMS API is. This app has several APIs and the layer has one key, so
+		// the endpoints it fetches move to the prefix it knows. That they are
+		// served from this app's own source, not the CMS's, is the point of them.
+		//
 		// Order matters. The package route matches anything, so it goes last, or
 		// it would swallow the source route.
-		route("  GET /api/v1/godoc                ", gate.Account(authsvc, godocs.Index)),
-		route("  GET /api/v1/godoc/src/{file...}  ", gate.Account(authsvc, godocs.Source)),
-		route("  GET /api/v1/godoc/{pkg...}       ", gate.Account(authsvc, godocs.Package)),
+		route("  GET /content-api/v1/godoc                ", gate.Account(authsvc, godocs.Index)),
+		route("  GET /content-api/v1/godoc/src/{file...}  ", gate.Account(authsvc, godocs.Source)),
+		route("  GET /content-api/v1/godoc/{pkg...}       ", gate.Account(authsvc, godocs.Package)),
 
 		// higrp.GET("/tags/*path", hi.TagsHandler)
 		route("  GET /media/videos/{path...}   ", serveContentWithPrefix("videos")), // used for serving local video on opalstack

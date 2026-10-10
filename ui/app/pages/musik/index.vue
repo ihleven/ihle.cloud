@@ -7,15 +7,16 @@
          to shrink, so on a phone the filter was the only thing that could — and
          it shrank to nothing, leaving a control that was present, focusable and
          invisible. A second line is the honest answer to not enough width. -->
-    <nav class="sticky top-0 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-accented bg-default px-2 py-1">
-      <NuxtLink to="/" class="flex shrink-0 items-center gap-0.5 text-sm text-muted hover:text-highlighted">
-        <UIcon name="i-lucide-chevron-left" class="size-5" />
-        <span class="hidden sm:inline">Zurück</span>
-      </NuxtLink>
+    <!-- What this page is goes in the header, which is where every page says
+         it. The way home went with it: the header offers no way back from an
+         area's own root, because an area root is a destination, and the menu
+         reaches the front page from anywhere. -->
+    <PageTitle>
+      Musik
+      <span v-if="shown.length" class="font-normal opacity-70 tabular-nums">{{ shown.length }}</span>
+    </PageTitle>
 
-      <h1 class="shrink-0 text-sm font-semibold text-highlighted">Musik</h1>
-      <span v-if="shown.length" class="shrink-0 text-xs text-muted tabular-nums">{{ shown.length }}</span>
-
+    <nav class="sticky top-(--sticky-top) flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-accented bg-default px-2 py-1">
       <UInput
         v-model="query"
         size="xs"

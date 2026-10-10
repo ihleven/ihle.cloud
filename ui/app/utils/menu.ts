@@ -19,9 +19,12 @@ export interface Box {
  * whole panel: the distance to the panel's furthest corner, plus a gutter so
  * the content is not left sitting on the edge.
  *
- * The circle grows from the button, which sits at the panel's top right, so
- * the furthest corner is always the bottom left one — this is the panel's own
- * diagonal, give or take the button's inset from the corner.
+ * All four corners are measured rather than the one the button is diagonally
+ * opposite. That used to be written down as a fact — the button sat at the
+ * panel's top right, so the far corner was always the bottom left — and it
+ * stopped being true the first time the button moved: below lg it is in the
+ * bottom corner, and the panel is above it rather than below. Asking which
+ * corner is furthest costs three more hypotenuses and cannot be wrong.
  *
  * Taken from the button's measured position rather than from the lengths it is
  * positioned with, so a safe-area inset is accounted for without this having to
@@ -31,5 +34,12 @@ export function discRadius(panel: Box, button: Box, gutter = 24): number {
   const x = (button.left + button.right) / 2
   const y = (button.top + button.bottom) / 2
 
-  return Math.hypot(x - panel.left, panel.bottom - y) + gutter
+  const corners = [
+    Math.hypot(x - panel.left, y - panel.top),
+    Math.hypot(x - panel.left, y - panel.bottom),
+    Math.hypot(x - panel.right, y - panel.top),
+    Math.hypot(x - panel.right, y - panel.bottom),
+  ]
+
+  return Math.max(...corners) + gutter
 }

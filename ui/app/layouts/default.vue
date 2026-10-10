@@ -1,26 +1,38 @@
 <template>
   <div>
-    <!-- The bar and the content, together as tall as the screen: the content
-         takes whatever the bar leaves. Nothing subtracts the bar's height from
-         the viewport, so nothing has to be told what that height is, and a page
-         that hides the bar does not reserve room for one never rendered.
+    <!-- The bar and the content, together as tall as the screen: the column is
+         a screenful and the bar's height is taken out of it as padding, which
+         box-sizing keeps inside the hundred per cent rather than adding to it.
+         The bar is fixed and reserves nothing itself, so this is where the room
+         for it is made.
 
-         The footer is deliberately outside this column. Inside it, it would be
-         part of the screenful and sit at the bottom of the viewport on a short
-         page; outside, the column fills the screen on its own and the footer
-         begins exactly at the fold — reached by scrolling, not on arrival. -->
+         The footer is after the column rather than inside it. Inside, it would
+         be part of the screenful and sit at the bottom of the viewport on a
+         short page; after it, the column fills the screen on its own and the
+         footer begins exactly at the fold — reached by scrolling, not on
+         arrival. -->
     <!-- --content-shell-offset is for what is embedded rather than for anything
          drawn here: the CMS's content module frames itself against the window
-         and can only subtract what this shell has already spent above it. -->
+         and can only subtract what this shell has already spent above it.
+
+         Built from the one number the header publishes rather than from a
+         second idea of the same thing. It used to be forced to 0px below lg
+         while <main> was padded by the strip's height, and a page framed
+         against the window was then that much too tall: 900px of window,
+         948px of page.
+
+         The band is the only part that is not in --top-height, because it
+         hangs under the wide rendering alone. Nothing below lg, therefore, and
+         its own height above. -->
     <div
-      class="flex min-h-screen flex-col"
+      class="flex min-h-screen flex-col pt-(--top-height) [--band-spent:0px] [--content-shell-offset:calc(var(--top-height)+var(--band-spent))] lg:[--band-spent:var(--band-height)]"
       :style="{
         '--page-bg': shell.background,
         '--band-to': shell.bandTo ?? shell.background,
-        '--content-shell-offset': offset,
+        '--band-height': band ?? '0px',
+        '--sticky-top': stickyTop,
       }"
     >
-      <AppBar v-if="shell.bar" :pinned="pinned" />
 
       <!-- The join between the strip and the page, where a page asks for one.
            A gradient rather than a gap: a page whose content begins hard against
@@ -46,62 +58,55 @@
            aria-hidden and empty: it is a colour, and there is nothing in it to
            read or to land on. -->
       <div
-        v-if="shell.bar && band"
-        class="shrink-0"
+        v-if="band"
+        class="shrink-0 max-lg:hidden"
         :style="{ height: band, background: fade }"
         aria-hidden="true"
       />
 
       <!-- A plain <main>, beside the bar rather than around it: this is the
            document's dominant content, and the bar is a banner next to it. -->
-      <main
-        class="flex grow bg-(--page-bg)"
-        :style="{ paddingBottom: reserved }"
-      >
+      <main class="flex grow bg-(--page-bg)">
         <slot />
       </main>
     </div>
 
-    <Footer v-if="shell.footer" />
+    <!-- Not on a narrow screen. It repeats the areas the menu already carries
+         and the account the menu already shows, offers a label that is not a
+         link, and ends in a table of dashes that reports nothing by design. On
+         a page you scroll with a thumb that is a long way to the bottom for
+         nothing. A wide screen has room for a page to end somewhere. -->
+    <Footer v-if="shell.footer" class="max-lg:hidden" />
 
-    <!-- Last, so its button is above everything and its panel above everything
-         but the button.
-
-         A page that supplies its own way out — the reader does — can turn this
-         off, or the round button would sit over it. -->
-    <AppMenu
-      v-if="shell.menu"
-      :pinned="menuPinned"
-    />
+    <!-- Last, which is the whole of why it paints over the page: this app sets
+         no z-index and stacks by document order, and a page's own positioned
+         content — Musik's album tiles are `relative` — beats anything written
+         before it. Written at the top of the column it was scrolled over; the
+         room it needs is the column's padding, not its place in the flow. -->
+    <Header />
   </div>
 </template>
 
 <script setup lang="ts">
-// The default shell: a strip at the top, the footer, and the player over
-// whatever is playing. Navigation is the menu, at every width, plus the areas
-// written into the top strip where there is room for them.
+// The page's own furniture: the strip at the top, the band under it, the
+// background, and the footer. Not the navigation — that is the shell, in
+// app.vue, where it survives the way from one layout to the next.
 //
-// A page keeps all of it unless it says otherwise. What it can turn off is in
-// ShellParts; what it cannot is anything depending on who is signed in, because
-// definePageMeta is resolved at build time — that belongs here, or in a layout
-// of the module's own, as geheimtipp's footer does.
-const route = useRoute()
+// What a page may refuse is `shell` meta, read through useShell so that this
+// and the shell itself cannot hold two opinions about it.
+const { shell } = useShell()
 
-const shell = computed(() => ({
-  bar: true,
-  footer: true,
-  menu: true,
-  // The colour the pages have always been. Named here rather than left to the
-  // <main> element's class, because the band has to fade to exactly it and two
-  // places saying what the page's colour is would eventually disagree.
-  background: 'var(--color-ral-7004)',
-  band: '2rem' as string | false,
-  // The strip keeps its own colour for the first part of the band. Fading from
-  // the very first pixel leaves the strip without an edge — the colour is
-  // already going where the eye is still looking for the join.
-  bandHold: '40%',
-  ...(route.meta.shell ?? {}),
-}))
+/**
+ * What a page's own sticky things have to clear.
+ *
+ * The header is over the page, so they clear what it covers: all of it, or only
+ * the band where the page has sent the row away.
+ *
+ * One number rather than six pages each choosing, which is how two of them came
+ * to stick underneath the header and hide their own first inch.
+ */
+const stickyTop = computed(() =>
+  (shell.value.top.scrolls ? 'var(--status-bar)' : 'var(--top-height)'))
 
 // A height, or nothing. '0' is spelled out as often as false is, and a band of
 // no height with a gradient in it is a thing the browser will happily lay out.
@@ -129,36 +134,4 @@ const fade = computed(() => {
 
   return `linear-gradient(to bottom, ${stops.join(', ')})`
 })
-
-// Whether the band at the top stays put while the page scrolls.
-//
-// One decision for the strip and the round button, because they sit in the same
-// band: one of them staying while the other left was the only thing that made
-// it look like two decisions. A page can still part them — the reader has no
-// strip and its way out leaves with the page — by saying so for the menu alone.
-const pinned = computed(() => shell.value.bar === 'fixed')
-const menuPinned = computed(() =>
-  shell.value.menu === true ? pinned.value : shell.value.menu === 'fixed',
-)
-
-// What a page filling the window has to leave for this shell: the strip, and
-// the band under it where there is one. Worked out here because it is this
-// layout that decides whether either is drawn — a page cannot know, and the one
-// that needs the answer is the CMS's content module, which comes from a layer
-// and knows nothing about this app's strip at all.
-//
-// Ordinary pages ignore it. They grow to what is in them and the column handles
-// the rest; this is for the one kind of page that is a frame rather than a
-// document.
-const offset = computed(() => {
-  if (!shell.value.bar) return '0px'
-
-  return band.value ? `calc(var(--bar-height) + ${band.value})` : 'var(--bar-height)'
-})
-
-// Room at the foot for the player, when something is playing. Reserved here
-// rather than by each page, because the player outlives any of them.
-const { current } = usePlayer()
-
-const reserved = computed(() => (current.value ? '4rem' : undefined))
 </script>

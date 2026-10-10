@@ -93,7 +93,7 @@ There is a test for each.
 
 ### The gate
 
-Pages under `/geheimtipp/**` keep `definePageMeta({ public: true })`, and that
+Pages under `/geheimtipp/**` keep `definePageMeta({ unguarded: true })`, and that
 flag must stay. It is about this app's sign-in overlay, not about access:
 without it every visitor to the pool would meet an ihlvn sign-in dialog laid
 over pages they are welcome to read. Removing it "for consistency" now that the

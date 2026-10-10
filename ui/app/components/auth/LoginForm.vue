@@ -1,7 +1,7 @@
 <template>
   <div class="w-full text-white">
     <header class="mb-6 text-center">
-      <Wordmark class="!text-white [&_*]:!text-white" />
+      <Wordmark class="text-white" />
       <p class="mt-2 text-sm text-white/60">Bitte anmelden</p>
     </header>
 

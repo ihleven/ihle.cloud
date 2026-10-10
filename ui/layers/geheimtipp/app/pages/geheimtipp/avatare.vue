@@ -82,7 +82,7 @@ import type { AvatarFile } from '../../types'
 
 // Moved under the pool's prefix: the old site had this at /avatare, and the
 // root belongs to the family app.
-definePageMeta({ public: true, layout: 'geheimtipp' })
+definePageMeta({ unguarded: true, layout: 'geheimtipp' })
 
 const { data: avatare, status, error } = await useGht<AvatarFile[]>('/avatars')
 

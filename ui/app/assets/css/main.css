@@ -116,7 +116,7 @@
   --shell-width: 80rem;
 
   /* How tall the row inside the strip is.
-     Taller than the row needs, deliberately — AppBar says why. Held here
+     Taller than the row needs, deliberately — Header says why. Held here
      because the strip is no longer the only thing that has to know: the layout
      tells an embedded module how much of the window is already spent above it,
      and a module framed against a strip of the wrong height is a scrollbar on a
@@ -322,3 +322,50 @@
    positioned sibling, give it a position too and put it later — as the pool
    door in pages/index.vue does with its blurred backdrop. */
 
+
+/* The document's own colour, below lg, where the shell paints a black strip
+   across the top of the window.
+   At scroll offset zero iOS lights the top edge of a scroll view and blurs what
+   lies behind the content rather than the fixed strip over it — so the colour
+   that reaches the status bar there is this one, not the strip's. Black, so the
+   two agree and the bar stays one colour whether the page has been scrolled or
+   not. */
+@media (width < 64rem) {
+  html,
+  body {
+    background-color: var(--shell-top, black);
+  }
+}
+
+/* What the system draws over the top of the page, and how much of the window
+   the header therefore covers.
+
+   The inset alone is not enough. A notched iPhone reports ~47px and an iPad
+   without a notch reports nothing at all — and still draws a translucent status
+   bar over the page, which then sits on the header's own row instead of on a
+   band of flat colour, with whatever is scrolling past showing through it. So:
+   at least a status bar's worth, where there is a status bar.
+
+   Zero here, and set by app.vue where the app is installed. Not by a
+   display-mode query: iPadOS does not reliably answer one, and useStandalone
+   already asks the question properly — the query *and* navigator.standalone,
+   which iOS has answered since long before it supported the query. In a browser
+   tab there is no bar over the page and this stays zero.
+
+   A variable and not a measurement: the heights are known, and a page needs the
+   number in a class, where Nuxt state cannot be read. */
+:root {
+  --status-bar: 0px;
+  --top-height: calc(var(--status-bar) + 3.5rem);
+
+  /* What a page's own sticky things have to clear. The layout says what it is
+     — nothing inside the frame, the header's height over a document — and this
+     is the answer for anything drawn outside that layout. */
+  --sticky-top: var(--top-height);
+}
+
+@media (width >= 64rem) {
+  :root {
+    --top-height: calc(var(--status-bar) + var(--bar-height));
+  }
+}

@@ -9,6 +9,6 @@
        together and remembered about. In em it simply is the type's size, and
        the next change to the one is the change to the other. -->
   <h1 class="font-mono text-xl/6 font-black">
-    ihle<span class="font-light text-default">ven</span><UIcon name="i-lucide-cloud" class="inline-block size-[1em] align-middle text-dimmed" />
+    ihle<span class="font-light opacity-70">ven</span><UIcon name="i-lucide-cloud" class="inline-block size-[1em] align-middle opacity-50" />
   </h1>
 </template>

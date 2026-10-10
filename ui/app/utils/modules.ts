@@ -108,19 +108,6 @@ export const appModules: Module[] = [
  * `/musik` and `/musik/anything`, but not `/musikschule`. Paths that belong to
  * no module (the front page, signing in) are common ground.
  */
-/**
- * What a concern is drawn as where it stands for its areas.
- *
- * Only the navigation needs this, and only for the concerns — an area brings
- * its own icon. Kept beside the list rather than repeated on every module that
- * belongs to one, and a concern with no entry here simply shows its name.
- */
-export const concernIcons: Record<string, string> = {
-  Verwaltung: 'i-lucide-sliders-horizontal',
-  Medien: 'i-lucide-play',
-  Familie: 'i-lucide-users',
-}
-
 export function moduleAt(path: string): Module | undefined {
   return appModules.find(m => path === m.at || path.startsWith(m.at + '/'))
 }
@@ -133,16 +120,4 @@ export function navModules(): Module[] {
 /** The modules the front page shows, which is those with a tile. */
 export function tileModules(): Module[] {
   return appModules.filter(m => m.tile)
-}
-
-/**
- * How the bottom bar divides what an account may see.
- *
- * A tab bar holds four and a menu button; everything past that lives in the
- * menu. Given fewer than there is room for, nothing is held back — but the
- * menu button stays regardless, because it carries signing out and the way to
- * anything the bar is too small for.
- */
-export function splitForBar(entitled: Module[], room = 4): { shown: Module[], rest: Module[] } {
-  return { shown: entitled.slice(0, room), rest: entitled.slice(room) }
 }

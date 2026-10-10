@@ -71,7 +71,7 @@
 <script setup lang="ts">
 // The button scrolls away with the page here, so it is not sitting over the
 // stills as you come down the list.
-definePageMeta({ shell: { bar: 'fixed', menu: 'fixed', background: 'var(--color-white)' } })
+definePageMeta({ shell: { background: 'var(--color-white)' } })
 
 const { public: { api } } = useRuntimeConfig()
 

@@ -29,6 +29,11 @@
 // it would move it down by the height of the band.
 definePageMeta({
   shell: {
+    // The same green the band arrives at, so the top of the screen is one
+    // colour from the status bar down to the block saying what day it is.
+    // Dark ink on it: white on this green is about 2.3:1 and black about 7:1,
+    // and iOS picks dark indicators against a colour this light anyway.
+    top: { colour: 'var(--color-green-500)', ink: 'dark' },
     background: 'var(--ui-bg-elevated)',
     bandTo: 'var(--color-green-500)',
     // Through a pale green rather than straight from white. White to a

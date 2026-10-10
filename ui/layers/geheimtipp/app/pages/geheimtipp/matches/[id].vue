@@ -39,7 +39,7 @@
 <script setup lang="ts">
 import type { MatchDetail } from '../../../types'
 
-definePageMeta({ public: true, layout: 'geheimtipp' })
+definePageMeta({ unguarded: true, layout: 'geheimtipp' })
 
 const id = useRoute().params.id as string
 

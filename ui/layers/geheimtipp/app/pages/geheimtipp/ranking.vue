@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ public: true, layout: 'geheimtipp' })
+definePageMeta({ unguarded: true, layout: 'geheimtipp' })
 
 const { edition } = useGhtSession()
 const { ausgabe, load } = useGhtEdition()

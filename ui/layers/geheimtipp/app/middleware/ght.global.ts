@@ -15,7 +15,7 @@
 // because making it leaves every page asking for a URL with the edition missing
 // out of the middle.
 //
-// The pages stay `public: true`. That is about app.vue's overlay, not about
+// The pages stay `unguarded: true`. That is about app.vue's overlay, not about
 // access: without it every visitor to the pool would meet this app's sign-in
 // dialog laid over the pool's pages, including the ones they are welcome to
 // read.

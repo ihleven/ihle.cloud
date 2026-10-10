@@ -29,7 +29,7 @@
 <script setup lang="ts">
 import type { CompSeason } from '../../../types'
 
-definePageMeta({ public: true, layout: 'geheimtipp' })
+definePageMeta({ unguarded: true, layout: 'geheimtipp' })
 
 const { edition } = useGhtSession()
 const { comp, load } = useGhtEdition()

@@ -26,7 +26,7 @@
 <script setup lang="ts">
 // Public to this app: the pool's own gate is the layer's middleware, and the
 // family app's sign-in overlay has no business covering this.
-definePageMeta({ public: true, layout: 'geheimtipp' })
+definePageMeta({ unguarded: true, layout: 'geheimtipp' })
 
 // Already loaded by the gate — /aktuell is both the session probe and this
 // page's content, which is why it is one request and not two.

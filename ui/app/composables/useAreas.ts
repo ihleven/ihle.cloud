@@ -46,34 +46,8 @@ export function useAreas() {
     return groups
   })
 
-  /**
-   * For the bar along the top, which has one line and a wordmark to fit beside:
-   * one entry per concern, with its areas behind it.
-   */
-  const menus = computed<NavigationMenuItem[]>(() =>
-    grouped.value.flatMap(({ concern, areas }) => concern
-      ? [{
-          label: concern,
-          icon: concernIcons[concern],
-          active: areas.some(a => at(a.at)),
-          children: areas.map(link),
-        }]
-      : areas.map(link)),
-  )
-
-  /**
-   * For the menu panel, which has a column and no shortage of room: the same
-   * grouping as headed sections, so everything is one click away rather than
-   * two.
-   */
-  const sections = computed<NavigationMenuItem[][]>(() =>
-    grouped.value.map(({ concern, areas }) => concern
-      ? [{ label: concern, type: 'label' as const }, ...areas.map(link)]
-      : areas.map(link)),
-  )
-
   /** Flat, for the footer's own column of areas. */
   const items = computed<NavigationMenuItem[]>(() => areas.value.map(link))
 
-  return { areas, items, menus, sections }
+  return { areas, grouped, items }
 }

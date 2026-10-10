@@ -48,7 +48,7 @@
       </section>
     </header>
 
-    <DriveBreadcrumbs :path="path" class="sticky top-0 border-b border-gray-300 bg-gray-100" />
+    <DriveBreadcrumbs :path="path" class="sticky top-(--sticky-top) border-b border-gray-300 bg-gray-100" />
 
     <div v-if="meta?.category === 'office'" class="h-full">
       <embed :type="meta.mime_type" :src="media(path)" class="h-screen w-full">
@@ -123,7 +123,15 @@
 <script setup lang="ts">
 // The page paints its own bg-gray-50, so the band under the strip has to arrive
 // at that and not at the colour the layout would otherwise use.
-definePageMeta({ shell: { background: 'var(--color-gray-50)' } })
+definePageMeta({
+  shell: {
+    // The same grey the page is, so the strip at the top and the page under it
+    // are one surface rather than two. Dark ink: this grey is nearly white, and
+    // iOS picks dark indicators against it for the same reason.
+    top: { colour: 'var(--color-gray-50)', ink: 'dark' },
+    background: 'var(--color-gray-50)',
+  },
+})
 
 const route = useRoute()
 const { meta: fetchMeta, media, thumb } = useDrive()
